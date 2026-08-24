@@ -86,7 +86,8 @@ export interface Photo {
 /** 계획 대비 비교 결과 */
 export type CompareStatus = 'match' | 'over' | 'under' | 'insufficient'
 
-interface ComparisonBase {
+/** 공정·자재 비교가 공유하는 필드 */
+export interface ComparisonBase {
   key: string
   location: string
   workType: string

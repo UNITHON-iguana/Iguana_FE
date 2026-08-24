@@ -2,12 +2,13 @@ import { useState } from 'react'
 
 import { PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, DatePicker, Empty, Flex, Form, Input, Modal, Table, Typography } from 'antd'
+import { App, Button, DatePicker, Empty, Flex, Form, Input, Modal, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router'
 
 import { createProject, getProjects } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
+import { DataTable } from '@/components/DataTable'
 import type { Project } from '@/types'
 
 interface ProjectFormValues {
@@ -70,14 +71,11 @@ export function ProjectsPage() {
         </Button>
       </Flex>
 
-      <Table
+      <DataTable
         rowKey="id"
-        bordered
-        size="small"
         loading={isLoading}
         dataSource={projects}
         columns={columns}
-        pagination={false}
         locale={{ emptyText: <Empty description="등록된 프로젝트가 없습니다" /> }}
       />
 

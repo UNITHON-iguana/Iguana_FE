@@ -2,11 +2,18 @@ import type { ThemeConfig } from 'antd'
 
 /**
  * 디자인 토큰 — 색·간격·타이포는 전부 여기서 파생시킨다.
- * 컴포넌트에서 색상 리터럴을 직접 쓰지 말고 `theme.useToken()`으로 읽는다.
  *
  * 방향: 엑셀처럼 보이게 한다.
  * 격자가 주인공이고, 모서리는 각지고, 밀도는 높다.
  * 색은 회색 계열이 기본이고 녹색은 주요 액션에만 쓴다.
+ *
+ * 사용법
+ * - 컴포넌트(tsx): `theme.useToken()`으로 읽는다. 색상 리터럴 금지(ESLint가 잡는다).
+ * - 인쇄용 CSS: `var(--ant-color-border)` 같은 CSS 변수를 쓴다(cssVar 모드).
+ * - antd 토큰에 대응이 없는 개념: 이 파일에서 export 한 상수를 쓴다.
+ *
+ * 새 antd 컴포넌트를 처음 쓸 때는 아래 `components`에 오버라이드를 먼저 추가한다.
+ * 기본값 그대로 두면 그 컴포넌트만 둥글고 헐렁하게 튄다.
  */
 
 const FONT_STACK = [
@@ -18,15 +25,24 @@ const FONT_STACK = [
   'sans-serif',
 ].join(', ')
 
-/** 주요 액션에만 쓰는 녹색 */
-const GREEN = '#217346'
+/**
+ * 주요 액션에만 쓰는 녹색.
+ * 저장·생성·내려받기처럼 사용자가 결과를 만드는 동작에만 붙인다.
+ */
+export const GREEN = '#217346'
 
 /** 격자선 — 화면의 뼈대라 다른 색보다 먼저 정한다 */
-const GRID_LINE = '#d4d8dd'
-const GRID_LINE_SOFT = '#e6e9ec'
+export const GRID_LINE = '#d4d8dd'
+export const GRID_LINE_SOFT = '#e6e9ec'
 
 /** 표 머리글과 라벨 칸 배경 */
-const HEADER_BG = '#f0f2f4'
+export const HEADER_BG = '#f0f2f4'
+
+/** 사진대지 양식에서 자재명 칸에 쓰는 연녹색 (원본 엑셀 양식과 맞춘 값) */
+export const SHEET_CATEGORY_BG = '#eaf0e2'
+
+/** 사진대지의 사진번호 — 원본 양식이 빨간 숫자를 쓴다 */
+export const SHEET_SEQ_COLOR = '#c0392b'
 
 export const theme: ThemeConfig = {
   // 토큰을 CSS 변수(--ant-*)로 내보낸다. 인쇄용 CSS에서도 같은 값을 참조할 수 있다.
@@ -117,6 +133,82 @@ export const theme: ThemeConfig = {
 
     Upload: {
       padding: 8,
+    },
+
+    // --- 아래는 아직 화면에 다 쓰이지 않았지만 미리 맞춰둔다 ---
+    // 새 화면에서 처음 쓸 때 이것만 튀는 일이 없게 한다.
+
+    Input: {
+      paddingBlockSM: 2,
+      paddingInlineSM: 6,
+      activeShadow: 'none',
+      errorActiveShadow: 'none',
+      warningActiveShadow: 'none',
+    },
+
+    InputNumber: {
+      activeShadow: 'none',
+    },
+
+    Select: {
+      optionSelectedBg: '#e8f0ec',
+      optionHeight: 28,
+      optionPadding: '4px 8px',
+    },
+
+    DatePicker: {
+      activeShadow: 'none',
+      cellHeight: 22,
+      cellWidth: 32,
+    },
+
+    Modal: {
+      headerBg: HEADER_BG,
+      titleFontSize: 14,
+      contentBg: '#ffffff',
+      padding: 16,
+      paddingContentHorizontalLG: 16,
+    },
+
+    Drawer: {
+      footerPaddingBlock: 8,
+      footerPaddingInline: 12,
+    },
+
+    Descriptions: {
+      labelBg: HEADER_BG,
+      titleMarginBottom: 8,
+      itemPaddingBottom: 8,
+    },
+
+    Segmented: {
+      itemSelectedBg: '#ffffff',
+      trackPadding: 2,
+    },
+
+    Tag: {
+      defaultBg: HEADER_BG,
+      borderRadiusSM: 2,
+    },
+
+    Button: {
+      primaryShadow: 'none',
+      defaultShadow: 'none',
+      dangerShadow: 'none',
+      paddingInline: 10,
+    },
+
+    Tooltip: {
+      borderRadius: 2,
+    },
+
+    Alert: {
+      withDescriptionPadding: '10px 12px',
+      defaultPadding: '6px 12px',
+    },
+
+    Empty: {
+      controlHeightLG: 32,
     },
   },
 }

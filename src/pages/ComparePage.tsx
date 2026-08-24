@@ -1,12 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Empty, Flex, Table, Tabs, Tag, Typography } from 'antd'
+import { Alert, Empty, Flex, Tabs, Tag, Typography } from 'antd'
 import { useParams } from 'react-router'
 
 import { getMaterialComparison, getWorkComparison } from '@/api/comparison'
 import { getPlanMaterialItems, getPlanWorkItems } from '@/api/plans'
 import { queryKeys } from '@/api/queryKeys'
+import type { ColumnType } from 'antd/es/table'
+
+import { numberColumn } from '@/components/columns'
+import { DataTable } from '@/components/DataTable'
 import { COMPARE_STATUS_LABEL } from '@/lib/constants'
-import type { CompareStatus, MaterialComparisonRow, WorkComparisonRow } from '@/types'
+import type {
+  CompareStatus,
+  ComparisonBase,
+  MaterialComparisonRow,
+  WorkComparisonRow,
+} from '@/types'
 
 const STATUS_COLOR: Record<CompareStatus, string> = {
   match: 'success',
@@ -26,35 +35,33 @@ function diff(planned: number | null, actual: number | null) {
   return value > 0 ? `+${value}` : String(value)
 }
 
-const sharedColumns = [
-  { title: '위치', dataIndex: 'location', width: 110 },
-  { title: '공종', dataIndex: 'workType', width: 110 },
-]
+/** 공정·자재 비교표가 공유하는 앞쪽 열 */
+function sharedColumns<T extends ComparisonBase>(): ColumnType<T>[] {
+  return [
+    { title: '위치', dataIndex: 'location', width: 110 },
+    { title: '공종', dataIndex: 'workType', width: 110 },
+  ]
+}
 
-const quantityColumns = [
-  { title: '계획 수량', dataIndex: 'plannedQuantity', width: 100, align: 'right' as const },
-  {
-    title: '확인 수량',
-    dataIndex: 'actualQuantity',
-    width: 100,
-    align: 'right' as const,
-    render: (value: number | null) => value ?? '-',
-  },
-  {
-    title: '차이',
-    width: 90,
-    align: 'right' as const,
-    render: (_: unknown, row: { plannedQuantity: number | null; actualQuantity: number | null }) =>
-      diff(row.plannedQuantity, row.actualQuantity),
-  },
-  { title: '단위', dataIndex: 'unit', width: 80 },
-  {
-    title: '상태',
-    dataIndex: 'status',
-    width: 140,
-    render: (status: CompareStatus) => <StatusTag status={status} />,
-  },
-]
+/** 공정·자재 비교표가 공유하는 뒤쪽 열 */
+function quantityColumns<T extends ComparisonBase>(): ColumnType<T>[] {
+  return [
+    numberColumn<T>({ title: '계획 수량', dataIndex: 'plannedQuantity' }),
+    numberColumn<T>({ title: '확인 수량', dataIndex: 'actualQuantity' }),
+    numberColumn<T>({
+      title: '차이',
+      width: 90,
+      render: (_, row) => diff(row.plannedQuantity, row.actualQuantity),
+    }),
+    { title: '단위', dataIndex: 'unit', width: 80 },
+    {
+      title: '상태',
+      dataIndex: 'status',
+      width: 140,
+      render: (status: CompareStatus) => <StatusTag status={status} />,
+    },
+  ]
+}
 
 export function ComparePage() {
   const { projectId = '' } = useParams()
@@ -114,17 +121,14 @@ export function ComparePage() {
             key: 'work',
             label: '공정 비교',
             children: (
-              <Table<WorkComparisonRow>
+              <DataTable<WorkComparisonRow>
                 rowKey="key"
-                bordered
-                size="small"
                 loading={workLoading}
                 dataSource={workRows}
-                pagination={false}
                 columns={[
-                  ...sharedColumns,
+                  ...sharedColumns<WorkComparisonRow>(),
                   { title: '작업내용', dataIndex: 'description' },
-                  ...quantityColumns,
+                  ...quantityColumns<WorkComparisonRow>(),
                 ]}
               />
             ),
@@ -133,17 +137,14 @@ export function ComparePage() {
             key: 'material',
             label: '자재 비교',
             children: (
-              <Table<MaterialComparisonRow>
+              <DataTable<MaterialComparisonRow>
                 rowKey="key"
-                bordered
-                size="small"
                 loading={materialLoading}
                 dataSource={materialRows}
-                pagination={false}
                 columns={[
-                  ...sharedColumns,
+                  ...sharedColumns<MaterialComparisonRow>(),
                   { title: '자재명', dataIndex: 'material' },
-                  ...quantityColumns,
+                  ...quantityColumns<MaterialComparisonRow>(),
                 ]}
               />
             ),

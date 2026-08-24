@@ -17,17 +17,35 @@
 - `src/api/*.ts` 는 전부 `src/mocks/` 의 인메모리 데이터를 돌려준다. 실제 HTTP 클라이언트
   `src/lib/api.ts` 는 작성만 되어 있고 아직 아무 데서도 import하지 않는다.
   백엔드 연동 시 이 둘을 바꿔 끼운다
-- `ConfigProvider`(`src/app/providers.tsx`)에 `locale`만 지정돼 있고 `theme`은 없다.
-  즉 antd 기본 토큰을 그대로 쓰는 상태다
+- `ConfigProvider`(`src/app/providers.tsx`)에 한국어 로캘과 `src/app/theme.ts`의
+  디자인 토큰이 연결돼 있다. `cssVar` 모드라 토큰이 `--ant-*` CSS 변수로도 나간다
 
 ## UI 작업 규칙
 
 **데스크톱 전용이다.** `src/index.css` 가 `#root { min-width: 1024px }` 로 못박아 두었고,
 좁은 창에서는 가로 스크롤을 허용한다. 모바일 반응형 작업은 하지 않는다.
 
-**색·간격·타이포는 `ConfigProvider`의 `theme` 한 곳에서 파생시킨다.** 컴포넌트마다
-`style`에 색상 리터럴을 박지 않는다. 새 토큰이 필요하면 antd MCP로 실제 토큰 키를
-확인한 뒤 추가한다.
+### 디자인 방향 — 엑셀처럼 보이게 한다
+
+사용자가 하루 종일 엑셀을 쓰는 사무·공무 담당자이고 결과물 자체가 엑셀 사진대지라,
+화면과 출력물이 같은 인상을 줘야 한다.
+
+- **격자가 주인공이다.** 표는 `@/components/DataTable`을 쓴다 (`bordered` + `size="small"`이
+  기본값). antd `Table`을 직접 쓰지 않는다 — 화면마다 옵션을 반복하면 언젠가 하나가 빠진다
+- 모서리는 각지게. `borderRadius`는 2 이하
+- 수량 열은 `@/components/columns`의 `numberColumn()`을 쓴다 (우측 정렬, 없는 값은 `-`)
+- 색은 회색 계열이 기본이다. 녹색(`colorPrimary`)은 저장·생성·내려받기처럼 사용자가
+  결과를 만드는 동작에만 붙인다
+- 히어로 섹션, 큰 여백, 연출된 모션은 쓰지 않는다
+
+**색·간격·타이포는 `src/app/theme.ts` 한 곳에서만 정의한다.**
+
+- 컴포넌트(tsx)에서는 `theme.useToken()`으로 읽는다. 색상 리터럴은 ESLint가 막는다
+- antd 토큰에 대응이 없는 개념(사진대지 양식 고유색 등)은 `theme.ts`가 export 한 상수를 쓴다
+- 인쇄용 CSS는 `var(--ant-color-border)` 같은 CSS 변수를 쓴다 (`cssVar` 모드)
+- **새 antd 컴포넌트를 처음 쓸 때는 `theme.ts`의 `components`에 오버라이드를 먼저 추가한다.**
+  기본값 그대로 두면 그 컴포넌트만 둥글고 헐렁하게 튄다. 토큰 키 이름은 antd MCP의
+  `antd_token`으로 확인한다 (MCP는 antd 기본값을 알려줄 뿐 우리가 정한 방향은 모른다)
 
 **UI 문구는 한국어다.** 상태 라벨은 `src/lib/constants.ts`에 모여 있고
 (`PHOTO_STATUS_LABEL`, `REVIEW_STATUS_LABEL`, `COMPARE_STATUS_LABEL`),

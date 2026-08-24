@@ -1,10 +1,11 @@
 import { InboxOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Flex, Table, Tabs, theme as antdTheme, Typography, Upload } from 'antd'
+import { Alert, Flex, Tabs, theme as antdTheme, Typography, Upload } from 'antd'
 import { useParams } from 'react-router'
 
 import { getPlanMaterialItems, getPlanWorkItems } from '@/api/plans'
 import { queryKeys } from '@/api/queryKeys'
+import { DataTable } from '@/components/DataTable'
 import { ACCEPTED_EXCEL_EXTENSIONS } from '@/lib/constants'
 
 function ExcelDropzone() {
@@ -65,13 +66,10 @@ export function PlanPage() {
             key: 'work',
             label: `계획 공정 (${workItems.length})`,
             children: (
-              <Table
+              <DataTable
                 rowKey="id"
-                bordered
-                size="small"
                 loading={workLoading}
                 dataSource={workItems}
-                pagination={false}
                 columns={[
                   { title: '위치', dataIndex: 'location', width: 120 },
                   { title: '공종', dataIndex: 'workType', width: 120 },
@@ -86,13 +84,10 @@ export function PlanPage() {
             key: 'material',
             label: `계획 자재 (${materialItems.length})`,
             children: (
-              <Table
+              <DataTable
                 rowKey="id"
-                bordered
-                size="small"
                 loading={materialLoading}
                 dataSource={materialItems}
-                pagination={false}
                 columns={[
                   { title: '위치', dataIndex: 'location', width: 120 },
                   { title: '공종', dataIndex: 'workType', width: 120 },

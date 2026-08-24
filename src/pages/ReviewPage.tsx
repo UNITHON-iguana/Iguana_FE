@@ -14,7 +14,6 @@ import {
   Input,
   Menu,
   Progress,
-  Table,
   Tag,
   theme as antdTheme,
   Typography,
@@ -24,6 +23,7 @@ import { useParams } from 'react-router'
 
 import { getPhotos, savePhotoReview } from '@/api/photos'
 import { queryKeys } from '@/api/queryKeys'
+import { DataTable } from '@/components/DataTable'
 import { DEFAULT_WORK_ITEM_ROWS, REVIEW_STATUS_LABEL } from '@/lib/constants'
 import type { Photo, WorkItem } from '@/types'
 
@@ -162,12 +162,9 @@ function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string
               행 추가
             </Button>
           </Flex>
-          <Table<WorkItem>
+          <DataTable<WorkItem>
             rowKey="id"
-            bordered
-            size="small"
             dataSource={draft.workItems}
-            pagination={false}
             columns={[
               {
                 title: '구분',

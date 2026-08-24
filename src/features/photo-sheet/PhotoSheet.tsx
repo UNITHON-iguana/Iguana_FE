@@ -1,3 +1,4 @@
+import { HEADER_BG, SHEET_CATEGORY_BG, SHEET_SEQ_COLOR } from '@/app/theme'
 import { DEFAULT_WORK_ITEM_ROWS } from '@/lib/constants'
 import type { WorkItem } from '@/types'
 
@@ -61,21 +62,29 @@ export function PhotoSheet({
 
           {page.map((entry) => (
             <div key={entry.id} className={styles.block}>
-              <div className={styles.seq}>{entry.seq}</div>
+              <div className={styles.seq} style={{ color: SHEET_SEQ_COLOR }}>
+                {entry.seq}
+              </div>
               <img className={styles.photo} src={entry.imageUrl} alt="" />
               <table className={styles.table}>
                 <tbody>
                   {padRows(entry.workItems, minRows).map((item, rowIndex) => (
                     <tr key={item?.id ?? `empty-${rowIndex}`}>
-                      <td className={styles.label}>구분</td>
-                      <td className={styles.category}>{item?.category ?? ''}</td>
-                      <td className={styles.label}>작업내용</td>
+                      <td className={styles.label} style={{ background: HEADER_BG }}>
+                        구분
+                      </td>
+                      <td className={styles.category} style={{ background: SHEET_CATEGORY_BG }}>
+                        {item?.category ?? ''}
+                      </td>
+                      <td className={styles.label} style={{ background: HEADER_BG }}>
+                        작업내용
+                      </td>
                       <td className={styles.spec}>{item?.spec ?? ''}</td>
                       <td className={styles.qty}>{item?.quantity ?? ''}</td>
                     </tr>
                   ))}
                   <tr>
-                    <td className={styles.label} colSpan={2}>
+                    <td className={styles.label} colSpan={2} style={{ background: HEADER_BG }}>
                       위치
                     </td>
                     <td className={styles.locationValue} colSpan={3}>

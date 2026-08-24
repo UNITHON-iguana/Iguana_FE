@@ -1,20 +1,11 @@
 import { InboxOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  App,
-  Button,
-  Flex,
-  Progress,
-  Table,
-  Tag,
-  theme as antdTheme,
-  Typography,
-  Upload,
-} from 'antd'
+import { App, Button, Flex, Progress, Tag, theme as antdTheme, Typography, Upload } from 'antd'
 import { useParams } from 'react-router'
 
 import { addPhotos, getPhotos, removePhoto, startAnalysis } from '@/api/photos'
 import { queryKeys } from '@/api/queryKeys'
+import { DataTable } from '@/components/DataTable'
 import { ACCEPTED_IMAGE_EXTENSIONS, PHOTO_STATUS_LABEL } from '@/lib/constants'
 import type { Photo, PhotoStatus } from '@/types'
 
@@ -117,12 +108,9 @@ export function UploadPage() {
         </Flex>
       )}
 
-      <Table<Photo>
+      <DataTable<Photo>
         rowKey="id"
-        bordered
-        size="small"
         dataSource={photos}
-        pagination={false}
         locale={{ emptyText: '업로드한 사진이 없습니다. 위 영역에 사진을 올려주세요.' }}
         columns={[
           { title: '번호', dataIndex: 'seq', width: 80 },
