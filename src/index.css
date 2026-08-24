@@ -1,0 +1,20 @@
+:root {
+  font-family:
+    'Pretendard',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Malgun Gothic',
+    sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* 데스크톱 전용 서비스 — 좁은 창에서는 가로 스크롤을 허용한다 */
+#root {
+  min-width: 1024px;
+}
