@@ -1,6 +1,5 @@
 import { useState } from 'react'
 
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -23,7 +22,7 @@ import { useParams } from 'react-router'
 
 import { getPhotos, savePhotoReview } from '@/api/photos'
 import { queryKeys } from '@/api/queryKeys'
-import { DataTable } from '@/components/DataTable'
+import { WorkItemGrid } from '@/features/review/WorkItemGrid'
 import { DEFAULT_WORK_ITEM_ROWS, REVIEW_STATUS_LABEL } from '@/lib/constants'
 import type { Photo, WorkItem } from '@/types'
 
@@ -74,13 +73,6 @@ function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string
     // 저장에 실패해도 편집 중인 값은 유지한다
     onError: () => message.error('저장에 실패했습니다. 다시 시도해주세요.'),
   })
-
-  function updateItem(itemId: string, patch: Partial<WorkItem>) {
-    setDraft((prev) => ({
-      ...prev,
-      workItems: prev.workItems.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-    }))
-  }
 
   return (
     <Card
@@ -149,90 +141,11 @@ function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string
           </Flex>
         </Flex>
 
-        <Flex vertical gap={8}>
-          <Flex justify="space-between" align="center">
-            <Typography.Text strong>작업 항목</Typography.Text>
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() =>
-                setDraft({ ...draft, workItems: [...draft.workItems, emptyWorkItem()] })
-              }
-            >
-              행 추가
-            </Button>
-          </Flex>
-          <DataTable<WorkItem>
-            rowKey="id"
-            dataSource={draft.workItems}
-            columns={[
-              {
-                title: '구분',
-                dataIndex: 'category',
-                render: (value: string | null, row) => (
-                  <Input
-                    value={value ?? ''}
-                    onChange={(e) => updateItem(row.id, { category: e.target.value || null })}
-                  />
-                ),
-              },
-              {
-                title: '작업내용',
-                dataIndex: 'description',
-                render: (value: string | null, row) => (
-                  <Input
-                    value={value ?? ''}
-                    onChange={(e) => updateItem(row.id, { description: e.target.value || null })}
-                  />
-                ),
-              },
-              {
-                title: '규격',
-                dataIndex: 'spec',
-                width: 120,
-                render: (value: string | null, row) => (
-                  <Input
-                    value={value ?? ''}
-                    placeholder="800*400"
-                    onChange={(e) => updateItem(row.id, { spec: e.target.value || null })}
-                  />
-                ),
-              },
-              {
-                title: '수량',
-                dataIndex: 'quantity',
-                width: 90,
-                render: (value: number | null, row) => (
-                  <Input
-                    value={value ?? ''}
-                    onChange={(e) =>
-                      updateItem(row.id, {
-                        quantity: e.target.value === '' ? null : Number(e.target.value),
-                      })
-                    }
-                  />
-                ),
-              },
-              {
-                title: '',
-                width: 48,
-                render: (_, row) => (
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        workItems: draft.workItems.filter((item) => item.id !== row.id),
-                      })
-                    }
-                  />
-                ),
-              },
-            ]}
-          />
-        </Flex>
+        <WorkItemGrid
+          items={draft.workItems}
+          createItem={emptyWorkItem}
+          onChange={(workItems) => setDraft({ ...draft, workItems })}
+        />
       </Flex>
     </Card>
   )
