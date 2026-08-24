@@ -62,8 +62,11 @@ function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string
       savePhotoReview(draft.id, {
         workDate: draft.workDate,
         location: draft.location,
-        // 빈 줄은 저장하지 않는다
-        workItems: draft.workItems.filter((item) => item.category || item.description || item.spec),
+        // 아무것도 입력하지 않은 줄만 버린다.
+        // 한 칸이라도 값이 있으면 남긴다 — 수량만 적어둔 줄이 사라지면 안 된다.
+        workItems: draft.workItems.filter(
+          (item) => item.category || item.description || item.spec || item.quantity != null,
+        ),
         reviewStatus: 'confirmed',
       }),
     onSuccess: () => {
