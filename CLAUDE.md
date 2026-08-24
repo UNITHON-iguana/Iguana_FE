@@ -43,9 +43,14 @@
 - 컴포넌트(tsx)에서는 `theme.useToken()`으로 읽는다. 색상 리터럴은 ESLint가 막는다
 - antd 토큰에 대응이 없는 개념(사진대지 양식 고유색 등)은 `theme.ts`가 export 한 상수를 쓴다
 - 인쇄용 CSS는 `var(--ant-color-border)` 같은 CSS 변수를 쓴다 (`cssVar` 모드)
-- **새 antd 컴포넌트를 처음 쓸 때는 `theme.ts`의 `components`에 오버라이드를 먼저 추가한다.**
-  기본값 그대로 두면 그 컴포넌트만 둥글고 헐렁하게 튄다. 토큰 키 이름은 antd MCP의
-  `antd_token`으로 확인한다 (MCP는 antd 기본값을 알려줄 뿐 우리가 정한 방향은 모른다)
+- **새 antd 컴포넌트에는 전역 토큰이 자동으로 적용된다.** antd는 각 컴포넌트의 고유
+  토큰을 `prepareComponentToken(token)`으로 전역 토큰에서 파생시킨다. 아직 한 번도 안 쓴
+  컴포넌트도 이미 반경 2, 폰트 12, 높이 28, 녹색 주색으로 나온다.
+  `theme.ts`의 `components`는 그 파생 결과가 우리 방향과 어긋나는 것만 손보는 자리다
+  (예: `Table.headerBg`는 antd 기본 회색이 우리가 원한 회색이 아니라 덮었다).
+  새 컴포넌트를 넣을 때 먼저 그냥 써보고, 어긋나는 값이 있을 때만 오버라이드를 추가한다.
+  토큰 키 이름은 antd MCP의 `antd_token`으로 확인한다
+  (MCP는 antd 기본값을 알려줄 뿐 우리가 정한 방향은 모른다)
 
 **UI 문구는 한국어다.** 상태 라벨은 `src/lib/constants.ts`에 모여 있고
 (`PHOTO_STATUS_LABEL`, `REVIEW_STATUS_LABEL`, `COMPARE_STATUS_LABEL`),

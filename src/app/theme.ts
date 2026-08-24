@@ -12,8 +12,9 @@ import type { ThemeConfig } from 'antd'
  * - 인쇄용 CSS: `var(--ant-color-border)` 같은 CSS 변수를 쓴다(cssVar 모드).
  * - antd 토큰에 대응이 없는 개념: 이 파일에서 export 한 상수를 쓴다.
  *
- * 새 antd 컴포넌트를 처음 쓸 때는 아래 `components`에 오버라이드를 먼저 추가한다.
- * 기본값 그대로 두면 그 컴포넌트만 둥글고 헐렁하게 튄다.
+ * 전역 토큰(`token`)은 아직 한 번도 안 쓴 컴포넌트에도 자동으로 적용된다.
+ * antd가 각 컴포넌트의 고유 토큰을 `prepareComponentToken(token)`으로 여기서 파생시키기
+ * 때문이다. 아래 `components`는 그 파생 결과가 우리 방향과 어긋나는 것만 손보는 자리다.
  */
 
 const FONT_STACK = [
@@ -135,8 +136,9 @@ export const theme: ThemeConfig = {
       padding: 8,
     },
 
-    // --- 아래는 아직 화면에 다 쓰이지 않았지만 미리 맞춰둔다 ---
-    // 새 화면에서 처음 쓸 때 이것만 튀는 일이 없게 한다.
+    // --- 아래는 아직 화면에 다 쓰이지 않은 컴포넌트들 ---
+    // 반경·폰트·높이는 전역 토큰에서 이미 파생되므로 여기 없어도 된다.
+    // 그림자 제거나 옵션 배경처럼 파생 결과가 우리 방향과 어긋나는 값만 덮어둔다.
 
     Input: {
       paddingBlockSM: 2,
