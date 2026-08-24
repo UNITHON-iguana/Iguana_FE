@@ -1,6 +1,16 @@
 import { InboxOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Flex, Progress, Table, Tag, Typography, Upload } from 'antd'
+import {
+  App,
+  Button,
+  Flex,
+  Progress,
+  Table,
+  Tag,
+  theme as antdTheme,
+  Typography,
+  Upload,
+} from 'antd'
 import { useParams } from 'react-router'
 
 import { addPhotos, getPhotos, removePhoto, startAnalysis } from '@/api/photos'
@@ -18,6 +28,7 @@ const STATUS_COLOR: Record<PhotoStatus, string> = {
 export function UploadPage() {
   const { projectId = '' } = useParams()
   const { message } = App.useApp()
+  const { token } = antdTheme.useToken()
   const queryClient = useQueryClient()
 
   const { data: photos = [] } = useQuery({
@@ -85,7 +96,7 @@ export function UploadPage() {
         style={{ padding: 8 }}
       >
         <p style={{ margin: 0 }}>
-          <InboxOutlined style={{ fontSize: 32, color: '#1677ff' }} />
+          <InboxOutlined style={{ fontSize: 28, color: token.colorPrimary }} />
         </p>
         <p>텍스트가 포함된 현장 사진을 끌어다 놓거나 클릭해 선택하세요</p>
         <Typography.Text type="secondary">
@@ -108,6 +119,7 @@ export function UploadPage() {
 
       <Table<Photo>
         rowKey="id"
+        bordered
         size="small"
         dataSource={photos}
         pagination={false}

@@ -1,17 +1,16 @@
-:root {
-  font-family:
-    'Pretendard',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Malgun Gothic',
-    sans-serif;
-}
+/* 가변 폰트 — 필요한 글자 영역만 내려받는 동적 서브셋 */
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+body {
+  /* 표에서 자릿수가 어긋나지 않게 고정폭 숫자를 쓴다 */
+  font-variant-numeric: tabular-nums;
 }
 
 /* 데스크톱 전용 서비스 — 좁은 창에서는 가로 스크롤을 허용한다 */

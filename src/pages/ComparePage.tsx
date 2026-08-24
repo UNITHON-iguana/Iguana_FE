@@ -116,6 +116,7 @@ export function ComparePage() {
             children: (
               <Table<WorkComparisonRow>
                 rowKey="key"
+                bordered
                 size="small"
                 loading={workLoading}
                 dataSource={workRows}
@@ -134,6 +135,7 @@ export function ComparePage() {
             children: (
               <Table<MaterialComparisonRow>
                 rowKey="key"
+                bordered
                 size="small"
                 loading={materialLoading}
                 dataSource={materialRows}

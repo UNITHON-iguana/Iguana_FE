@@ -7,13 +7,14 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/ko'
 
 import { queryClient } from './queryClient'
+import { theme } from './theme'
 
 dayjs.locale('ko')
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ConfigProvider locale={koKR}>
+      <ConfigProvider locale={koKR} theme={theme}>
         <AntdApp>{children}</AntdApp>
       </ConfigProvider>
     </QueryClientProvider>

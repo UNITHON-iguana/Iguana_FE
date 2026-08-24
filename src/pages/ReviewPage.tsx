@@ -16,6 +16,7 @@ import {
   Progress,
   Table,
   Tag,
+  theme as antdTheme,
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
@@ -50,6 +51,7 @@ function withDefaultRows(items: WorkItem[]): WorkItem[] {
  */
 function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string }) {
   const { message } = App.useApp()
+  const { token } = antdTheme.useToken()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<Photo>(() => ({
     ...photo,
@@ -117,8 +119,8 @@ function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string
                 style={{
                   width: 160,
                   height: 160,
-                  background: '#fafafa',
-                  border: '1px dashed #d9d9d9',
+                  background: token.colorFillQuaternary,
+                  border: `1px dashed ${token.colorBorder}`,
                 }}
               >
                 <Typography.Text type="secondary">분리 실패</Typography.Text>
@@ -162,6 +164,7 @@ function PhotoReviewCard({ photo, projectId }: { photo: Photo; projectId: string
           </Flex>
           <Table<WorkItem>
             rowKey="id"
+            bordered
             size="small"
             dataSource={draft.workItems}
             pagination={false}

@@ -72,6 +72,8 @@ export function ProjectsPage() {
 
       <Table
         rowKey="id"
+        bordered
+        size="small"
         loading={isLoading}
         dataSource={projects}
         columns={columns}

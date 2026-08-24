@@ -2,7 +2,18 @@ import { useState } from 'react'
 
 import { DownloadOutlined, PrinterOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Checkbox, Empty, Flex, Tabs, Typography } from 'antd'
+import {
+  Alert,
+  App,
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Flex,
+  Tabs,
+  theme as antdTheme,
+  Typography,
+} from 'antd'
 import { useParams } from 'react-router'
 
 import { getPhotos } from '@/api/photos'
@@ -14,6 +25,7 @@ import { PhotoSheet } from '@/features/photo-sheet/PhotoSheet'
 export function ExportPage() {
   const { projectId = '' } = useParams()
   const { message } = App.useApp()
+  const { token } = antdTheme.useToken()
   const [confirmedOnly, setConfirmedOnly] = useState(true)
   const [generating, setGenerating] = useState(false)
 
@@ -110,7 +122,11 @@ export function ExportPage() {
                     인쇄 · PDF로 저장
                   </Button>
                 </div>
-                <Card size="small" title="미리보기" styles={{ body: { background: '#f5f5f5' } }}>
+                <Card
+                  size="small"
+                  title="미리보기"
+                  styles={{ body: { background: token.colorBgLayout } }}
+                >
                   {target.length === 0 ? (
                     <Empty description="검수 완료된 작업 사진이 없습니다" />
                   ) : (

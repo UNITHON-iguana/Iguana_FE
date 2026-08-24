@@ -1,6 +1,6 @@
 import { InboxOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Flex, Table, Tabs, Typography, Upload } from 'antd'
+import { Alert, Flex, Table, Tabs, theme as antdTheme, Typography, Upload } from 'antd'
 import { useParams } from 'react-router'
 
 import { getPlanMaterialItems, getPlanWorkItems } from '@/api/plans'
@@ -8,6 +8,8 @@ import { queryKeys } from '@/api/queryKeys'
 import { ACCEPTED_EXCEL_EXTENSIONS } from '@/lib/constants'
 
 function ExcelDropzone() {
+  const { token } = antdTheme.useToken()
+
   return (
     <Upload.Dragger
       accept={ACCEPTED_EXCEL_EXTENSIONS}
@@ -17,7 +19,7 @@ function ExcelDropzone() {
       style={{ padding: 8 }}
     >
       <p style={{ margin: 0 }}>
-        <InboxOutlined style={{ fontSize: 32, color: '#1677ff' }} />
+        <InboxOutlined style={{ fontSize: 28, color: token.colorPrimary }} />
       </p>
       <p>계획 데이터 엑셀을 끌어다 놓거나 클릭해 선택하세요</p>
       <Typography.Text type="secondary">기본 템플릿 1종(.xlsx)을 지원합니다</Typography.Text>
@@ -65,6 +67,7 @@ export function PlanPage() {
             children: (
               <Table
                 rowKey="id"
+                bordered
                 size="small"
                 loading={workLoading}
                 dataSource={workItems}
@@ -85,6 +88,7 @@ export function PlanPage() {
             children: (
               <Table
                 rowKey="id"
+                bordered
                 size="small"
                 loading={materialLoading}
                 dataSource={materialItems}
