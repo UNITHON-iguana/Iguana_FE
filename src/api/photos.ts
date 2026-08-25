@@ -1,4 +1,4 @@
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { confirmBlocker } from '@/lib/workItems'
 import type { Photo, WorkItem, WorkType } from '@/types'
 
@@ -409,8 +409,37 @@ function toPatchRequest(photo: Photo, workTypes: WorkType[], confirm: boolean): 
  * 화면은 공종을 **이름**으로 다룬다(사진대지 `구 분` 칸이 이름을 고른다).
  * 서버는 id를 받으므로 등록된 공종 목록으로 이름을 id로 옮긴다.
  */
-export async function savePhoto(photo: Photo, workTypes: WorkType[]): Promise<Photo> {
-  const body = toPatchRequest(photo, workTypes, confirmBlocker(photo) === null)
-  const res = await api.patch<PhotoUploadResponse>(`/api/v1/photo-uploads/${photo.id}`, body)
-  return toPhoto(res, photo.projectId)
+export interface SaveResult {
+  photo: Photo
+  /**
+   * 확정하려 했지만 서버가 되돌린 이유. 없으면 `null`.
+   * 값은 저장됐고 사진은 검수 대기로 남아 있다는 뜻이다.
+   */
+  rejected: string | null
+}
+
+export async function savePhoto(photo: Photo, workTypes: WorkType[]): Promise<SaveResult> {
+  const path = `/api/v1/photo-uploads/${photo.id}`
+  const confirm = confirmBlocker(photo) === null
+  const body = toPatchRequest(photo, workTypes, confirm)
+
+  try {
+    const res = await api.patch<PhotoUploadResponse>(path, body)
+    return { photo: toPhoto(res, photo.projectId), rejected: null }
+  } catch (error) {
+    const rejectedConfirm = confirm && error instanceof ApiError && error.status === 400
+    if (!rejectedConfirm) throw error
+
+    /*
+     * 확정을 거절당했다 — 우리 판정과 서버 검증이 어긋났다는 뜻이다.
+     *
+     * **여기서 멈추면 사람이 방금 고친 값이 통째로 사라진다.** `confirm: true`는 하나라도
+     * 어긋나면 아무것도 저장하지 않기 때문이다. 확정만 접고 같은 내용을 다시 보내
+     * 값은 남긴다. 무엇이 막았는지는 서버가 알려준 말을 그대로 옮긴다.
+     *
+     * 이 길로 들어섰다는 것 자체가 `confirmBlocker`가 서버와 어긋났다는 신호다.
+     */
+    const res = await api.patch<PhotoUploadResponse>(path, { ...body, confirm: false })
+    return { photo: toPhoto(res, photo.projectId), rejected: error.message }
+  }
 }

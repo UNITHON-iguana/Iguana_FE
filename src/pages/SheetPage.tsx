@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Alert,
   App,
   Button,
   Empty,
@@ -19,7 +20,7 @@ import {
   Typography,
   Upload,
 } from 'antd'
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 
 import {
   addPhotos,
@@ -273,8 +274,13 @@ export function SheetPage() {
        * 값을 비워 지운 항목이 화면에 남아 있으면 다음 저장에 그 id가 또 실려 나가고,
        * 규격을 고쳤을 때 서버가 다시 계산한 수량도 이때 들어온다.
        */
-      const saved = await save(edited)
+      const { photo: saved, rejected } = await save(edited)
       setDrafts((prev) => ({ ...prev, [photo.id]: saved }))
+      /*
+       * 저장은 됐는데 확정이 되돌아왔다. 사람은 다 채웠다고 생각하고 넘어가는 참이라
+       * 무엇이 남았는지 그 자리에서 알려야 한다.
+       */
+      if (rejected) message.warning(rejected)
     } catch {
       // 실패는 mutation이 알린다. 고친 값은 붙들어 두어 다음 기회에 다시 나가게 한다
       waiting.current.set(photo.id, edited)
@@ -461,6 +467,24 @@ export function SheetPage() {
           </Upload>
         </Flex>
       </Flex>
+
+      {/*
+        공종은 AI가 고를 후보 목록이다. 비어 있으면 사진을 아무리 올려도 붙일 이름이
+        없다 — 사진을 올리기 전에 알아야 하므로 목록보다 위에 둔다.
+      */}
+      {workTypes.length === 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          title="등록된 공종이 없습니다"
+          description={
+            <>
+              AI는 등록된 공종 중에서만 고릅니다. 지금 사진을 올리면 공종을 붙이지 못합니다.{' '}
+              <Link to={`/projects/${projectId}/worktypes`}>공종 등록하러 가기</Link>
+            </>
+          }
+        />
+      )}
 
       {counts.photos === 0 ? (
         !isLoading && <Empty description={emptyDescription()} />

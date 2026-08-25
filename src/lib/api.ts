@@ -10,6 +10,24 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 서버가 실패를 돌려주는 모양 — `{ code, message, timestamp }`.
+ * 사람에게 보일 수 있는 건 `message` 하나뿐이라 그것만 꺼낸다.
+ * JSON이 아니면 본문을 그대로 쓴다 — 게이트웨이가 낸 오류는 이 모양이 아니다.
+ */
+function messageOf(body: string, fallback: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body)
+    if (parsed && typeof parsed === 'object' && 'message' in parsed) {
+      const { message } = parsed as { message: unknown }
+      if (typeof message === 'string' && message) return message
+    }
+  } catch {
+    // 본문이 JSON이 아니다
+  }
+  return body || fallback
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -20,7 +38,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
 
   if (!res.ok) {
-    throw new ApiError(res.status, await res.text().catch(() => res.statusText))
+    const body = await res.text().catch(() => '')
+    throw new ApiError(res.status, messageOf(body, res.statusText))
   }
 
   /*
@@ -47,7 +66,8 @@ function fileNameOf(header: string | null, fallback: string): string {
 async function download(path: string, fallbackName: string): Promise<void> {
   const res = await fetch(`${BASE_URL}${path}`)
   if (!res.ok) {
-    throw new ApiError(res.status, await res.text().catch(() => res.statusText))
+    const body = await res.text().catch(() => '')
+    throw new ApiError(res.status, messageOf(body, res.statusText))
   }
 
   const blob = await res.blob()

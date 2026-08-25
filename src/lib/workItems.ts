@@ -51,6 +51,14 @@ export function photoUncertainCount(photo: Photo): number {
  * **서버가 400을 내는 조건과 같아야 한다.** 어긋나면 저장이 서버에서 되돌아온다.
  */
 export function confirmBlocker(photo: Photo): string | null {
+  /*
+   * 항목이 하나도 없는 사진 — AI가 표를 읽지 못했다.
+   * 서버는 확정할 항목이 없으면 400을 낸다. 그리고 이런 사진은 확인할 노란 칸도
+   * 공종 빈 줄도 없어서, 여기서 막지 않으면 '다 됐다'로 새어 나간다.
+   */
+  if (!photo.workItems.some(hasContent)) {
+    return 'AI가 이 사진에서 작업 항목을 읽지 못했습니다. 줄 추가로 직접 입력해주세요'
+  }
   const uncertain = photoUncertainCount(photo)
   if (uncertain > 0) return `확인이 필요한 칸 ${uncertain}개를 먼저 채워주세요`
   /*
