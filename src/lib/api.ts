@@ -23,7 +23,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, await res.text().catch(() => res.statusText))
   }
 
-  return res.status === 204 ? (undefined as T) : ((await res.json()) as T)
+  /*
+   * 본문 없는 200도 온다 — 공종 삭제가 그렇다.
+   * `res.json()`을 바로 부르면 빈 본문에서 파싱 에러가 나므로 먼저 읽어보고 판단한다.
+   */
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 /** `Content-Disposition`이 알려주는 파일명. 없으면 부르는 쪽이 정한 이름을 쓴다 */

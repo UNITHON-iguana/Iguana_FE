@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router'
 
 import { createProject, getProjects } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
+import { createTrades } from '@/api/trades'
 import { DataTable } from '@/components/DataTable'
 import type { Project } from '@/types'
 
@@ -17,6 +18,15 @@ interface ProjectFormValues {
   period?: [Dayjs, Dayjs]
   /** 사진대지의 `구 분`으로 쓸 공종. 나중에 공종 화면에서 더할 수 있다 */
   trades?: string[]
+}
+
+/** 폼 값을 API가 받는 모양으로 옮긴 것 — 기간 한 칸이 시작·종료 두 값으로 갈린다 */
+interface CreateInput {
+  name: string
+  siteName: string
+  startDate: string | null
+  endDate: string | null
+  trades: string[]
 }
 
 export function ProjectsPage() {
@@ -31,12 +41,41 @@ export function ProjectsPage() {
     queryFn: getProjects,
   })
 
+  /**
+   * 프로젝트를 만들고, 적어 넣은 공종을 그 프로젝트에 일괄 등록한다.
+   *
+   * 공종 등록은 프로젝트가 생긴 뒤에야 할 수 있어 두 번에 나눠 부른다.
+   * **공종이 실패해도 프로젝트는 이미 만들어졌다** — 통째로 실패한 것처럼 알리면
+   * 사람이 같은 프로젝트를 또 만든다. 그래서 결과를 갈라서 전한다.
+   */
   const { mutate: create, isPending } = useMutation({
-    mutationFn: createProject,
-    onSuccess: (project) => {
+    mutationFn: async ({ trades, ...input }: CreateInput) => {
+      const project = await createProject(input)
+
+      const names = trades.map((name) => name.trim()).filter(Boolean)
+      if (names.length === 0) return { project, skipped: [], failed: false }
+
+      try {
+        const { skippedDuplicateNames } = await createTrades(project.id, names)
+        return { project, skipped: skippedDuplicateNames, failed: false }
+      } catch {
+        return { project, skipped: [], failed: true }
+      }
+    },
+    onSuccess: ({ project, skipped, failed }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects })
       setOpen(false)
       form.resetFields()
+
+      if (failed) {
+        message.warning(
+          '프로젝트는 만들어졌지만 공종을 등록하지 못했습니다. 공종 화면에서 추가해주세요.',
+        )
+      } else if (skipped.length > 0) {
+        // 서버가 겹치는 이름을 조용히 건너뛴다. 무엇이 빠졌는지는 사람이 알아야 한다
+        message.info(`이름이 겹쳐 ${skipped.join(', ')}은(는) 등록하지 않았습니다`)
+      }
+
       navigate(`/projects/${project.id}/sheet`)
     },
     // 저장에 실패해도 입력값은 유지한 채 재시도를 안내한다

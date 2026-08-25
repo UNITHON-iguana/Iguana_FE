@@ -8,7 +8,7 @@ import { trades } from '@/mocks/trades'
  * 서버가 만든다. 행 하나는 공종 하나이거나 `공종 + 규격` 하나다.
  */
 export interface AggregationRow {
-  workTypeId: string
+  workTypeId: number
   workTypeName: string
   /** 규격. 둘레 연장으로 환산한 행은 규격을 가리지 않으므로 null */
   spec: string | null

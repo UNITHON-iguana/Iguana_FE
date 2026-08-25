@@ -6,13 +6,15 @@ import type { Trade } from '@/types'
  * 실제 현장 파일(BS.xlsm) `집계표` 시트에 나오는 공종을 옮겼다.
  * **규격은 없다** — 사진마다 AI가 읽고, 집계 행은 서버가 규격까지 갈라서 만든다.
  *
- * 백엔드가 붙으면 이 파일 대신 `GET /projects/{id}/worktypes`가 같은 모양을 돌려준다.
+ * **공종 API는 이미 서버가 준다**(`src/api/trades.ts`). 이 파일은 아직 목으로 남은
+ * 집계(`src/api/aggregation.ts`)가 이름으로 공종을 찾을 때만 쓴다.
+ * 집계가 서버로 넘어가면 같이 사라진다.
  */
 
 let seq = 0
 
 function trade(name: string): Trade {
-  return { id: String(++seq + 100), projectId: 'p1', name }
+  return { id: ++seq + 100, name }
 }
 
 export const trades: Trade[] = [

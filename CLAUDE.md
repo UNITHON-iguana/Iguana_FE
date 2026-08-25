@@ -45,6 +45,10 @@
 없고, 받은 표를 날짜로 좁히거나 월로 접기만 한다. 자세한 것은 `docs/집계-규칙.md`.
 
 공종(`trades`)은 **이름만** 등록한다. 규격은 사진마다 AI가 읽는다.
+**이름은 등록한 뒤 고치지 못한다** — 서버에 수정 API가 없고 두지 않기로 했다.
+잘못 등록했으면 지우고 다시 만든다. 그래서 타이핑 중에는 아무것도 보내지 않고
+칸을 벗어날 때 한 번만 보낸다(`TradesPage`의 `commit`) — 중간에 저장하면
+`금속`처럼 덜 친 이름이 등록되고 되돌릴 방법이 없다.
 계획 데이터와 계획 대비 현황은 이 흐름 없이도 돌아가는 곁가지라 한 페이지(`plan`)로 묶어
 메뉴 구분선 아래에 둔다. 라우팅과 메뉴는 이 위계를 따른다
 (`src/app/router.tsx`, `src/layouts/AppLayout.tsx`의 `PROJECT_MENU`).
@@ -59,9 +63,16 @@
 
 ## 현재 상태
 
-- `src/api/*.ts` 는 전부 `src/mocks/` 의 인메모리 데이터를 돌려준다. 실제 HTTP 클라이언트
-  `src/lib/api.ts` 는 작성만 되어 있고 아직 아무 데서도 import하지 않는다.
-  백엔드 연동 시 이 둘을 바꿔 끼운다
+- **백엔드 연동이 모듈 단위로 진행 중이다.** `src/api/*.ts` 가 경계이고, 화면은 이 함수만
+  부르므로 안쪽이 목이든 HTTP든 모른다. 붙은 것과 안 붙은 것:
+  - 실제 HTTP(`src/lib/api.ts`): `exports.ts`(엑셀 두 개), `trades.ts`(공종 4개)
+  - 아직 `src/mocks/` 인메모리: `projects`, `photos`, `plans`, `aggregation`, `comparison`
+- 서버 주소는 `VITE_API_BASE_URL` 이다. `.env.example` 을 복사해 `.env` 를 만들어야 하고,
+  없으면 요청이 vite 자기 자신으로 가서 전부 404가 난다.
+  **git worktree 는 `.env` 를 공유하지 않는다** — 워크트리마다 따로 만든다
+- 서버가 채번한 id는 정수다(`Trade.id`, `AggregationRow.workTypeId`).
+  목이 만드는 id와 겹칠 수 있어, 목과 서버가 섞여 있는 동안은 id로 맞추는 판정
+  (`TradesPage`의 `inUse`)이 엉뚱한 줄을 잡을 수 있다. 집계가 서버로 가면 풀린다
 - `ConfigProvider`(`src/app/providers.tsx`)에 한국어 로캘과 `src/app/theme.ts`의
   디자인 토큰이 연결돼 있다. `cssVar` 모드라 토큰이 `--ant-*` CSS 변수로도 나간다
 
