@@ -117,9 +117,9 @@ export interface Photo {
  * 프로젝트마다 다르고, 사진대지는 이 목록에서 골라 넣는다.
  *
  * 서버 응답에는 `unit`도 있지만 여기 두지 않는다 — 화면이 쓰지 않는 값이라
- * 타입에 두면 언젠가 집계 단위와 헷갈려 쓰인다(`src/api/trades.ts`).
+ * 타입에 두면 언젠가 집계 단위와 헷갈려 쓰인다(`src/api/workTypes.ts`).
  */
-export interface Trade {
+export interface WorkType {
   /** 서버가 채번한다 */
   id: number
   /** 공종명 (예: '금속관벽체') */

@@ -7,10 +7,10 @@ import { useParams } from 'react-router'
 
 import { getAggregation } from '@/api/aggregation'
 import { queryKeys } from '@/api/queryKeys'
-import { createTrade, getTrades, removeTrade } from '@/api/trades'
+import { createWorkType, getWorkTypes, removeWorkType } from '@/api/workTypes'
 import { DataTable } from '@/components/DataTable'
 import { ApiError } from '@/lib/api'
-import type { Trade } from '@/types'
+import type { WorkType } from '@/types'
 
 /** 이름이 겹치는지 비교하기 전에 공백을 없앤다 — 사람이 친 값이다 */
 function squeeze(name: string) {
@@ -23,15 +23,15 @@ function squeeze(name: string) {
  * 추가 버튼은 화면에만 줄을 만든다. 이름이 채워지고 칸을 벗어날 때 비로소 등록된다 —
  * 버튼만 누르고 나간 빈 줄이 서버에 남지 않는다.
  */
-interface DraftTrade {
+interface DraftWorkType {
   /** 화면에서만 쓰는 키. 서버가 채번한 정수 id와 섞이지 않게 문자열로 둔다 */
   key: string
   name: string
 }
 
-type Row = Trade | DraftTrade
+type Row = WorkType | DraftWorkType
 
-function isDraft(row: Row): row is DraftTrade {
+function isDraft(row: Row): row is DraftWorkType {
   return 'key' in row
 }
 
@@ -45,19 +45,19 @@ function isDraft(row: Row): row is DraftTrade {
  * 그래서 타이핑 중에는 아무것도 보내지 않고 칸을 벗어날 때 한 번만 보낸다 —
  * 중간에 저장하면 `금속`처럼 덜 친 이름이 등록되고 되돌릴 방법이 없다.
  */
-export function TradesPage() {
+export function WorkTypesPage() {
   const { projectId = '' } = useParams()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
   const {
-    data: trades = [],
+    data: workTypes = [],
     isLoading,
     isError,
     refetch,
   } = useQuery({
-    queryKey: queryKeys.trades(projectId),
-    queryFn: () => getTrades(projectId),
+    queryKey: queryKeys.workTypes(projectId),
+    queryFn: () => getWorkTypes(projectId),
   })
 
   /* 이미 실적이 쌓인 공종을 못 지우게 막으려고 집계를 같이 본다. 화면에 표로 그리지는 않는다 */
@@ -75,7 +75,7 @@ export function TradesPage() {
    */
   const inUse = new Set((aggregation?.rows ?? []).map((row) => row.workTypeId))
 
-  const [drafts, setDrafts] = useState<DraftTrade[]>([])
+  const [drafts, setDrafts] = useState<DraftWorkType[]>([])
 
   /**
    * 등록 요청이 나가 있는 임시 줄.
@@ -87,12 +87,12 @@ export function TradesPage() {
 
   /** 공종이 바뀌면 그 이름으로 묶인 집계도 다시 받아야 한다 */
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.trades(projectId) })
+    queryClient.invalidateQueries({ queryKey: queryKeys.workTypes(projectId) })
     queryClient.invalidateQueries({ queryKey: queryKeys.aggregation(projectId) })
   }
 
   const { mutate: create } = useMutation({
-    mutationFn: (draft: DraftTrade) => createTrade(projectId, draft.name.trim()),
+    mutationFn: (draft: DraftWorkType) => createWorkType(projectId, draft.name.trim()),
     onMutate: (draft) => setSending((prev) => [...prev, draft.key]),
     onSuccess: (_created, draft) => {
       setDrafts((prev) => prev.filter((row) => row.key !== draft.key))
@@ -112,15 +112,15 @@ export function TradesPage() {
   })
 
   const { mutate: remove } = useMutation({
-    mutationFn: (workTypeId: number) => removeTrade(projectId, workTypeId),
+    mutationFn: (workTypeId: number) => removeWorkType(projectId, workTypeId),
     onSuccess: invalidate,
     onError: () => message.error('공종을 지우지 못했습니다. 다시 시도해주세요.'),
   })
 
-  const registered = new Set(trades.map((trade) => squeeze(trade.name)))
+  const registered = new Set(workTypes.map((workType) => squeeze(workType.name)))
 
   /** 이 임시 줄의 이름을 지금 등록할 수 있는지 */
-  function collides(draft: DraftTrade): boolean {
+  function collides(draft: DraftWorkType): boolean {
     const name = squeeze(draft.name)
     if (!name) return false
     if (registered.has(name)) return true
@@ -134,7 +134,7 @@ export function TradesPage() {
    * 이름이 비었으면 아무것도 보내지 않고 줄만 화면에 남긴다 —
    * 잠깐 다른 곳을 봤다고 방금 만든 줄이 사라지면 놀란다.
    */
-  function commit(draft: DraftTrade) {
+  function commit(draft: DraftWorkType) {
     if (!draft.name.trim() || sending.includes(draft.key)) return
     if (collides(draft)) {
       // 칸이 빨개지는 것만으로는 부족하다 — 손을 뗀 순간 초점도 같이 떠나 있다
@@ -148,7 +148,7 @@ export function TradesPage() {
     setDrafts((prev) => prev.map((row) => (row.key === key ? { ...row, name } : row)))
   }
 
-  const rows: Row[] = [...trades, ...drafts]
+  const rows: Row[] = [...workTypes, ...drafts]
 
   return (
     <Flex vertical gap={16}>

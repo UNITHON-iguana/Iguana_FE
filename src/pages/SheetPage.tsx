@@ -35,7 +35,7 @@ import type { PhotoCounts, PhotoScope, WorkDateFilter, WorkDateOption } from '@/
 import { downloadSheetExcel } from '@/api/exports'
 import { getProject } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
-import { getTrades } from '@/api/trades'
+import { getWorkTypes } from '@/api/workTypes'
 import { PhotoSheetGrid } from '@/features/photo-sheet/PhotoSheetGrid'
 import { ACCEPTED_IMAGE_EXTENSIONS, PHOTOS_PER_PAGE } from '@/lib/constants'
 import { confirmBlocker, needsReview } from '@/lib/workItems'
@@ -130,10 +130,10 @@ export function SheetPage() {
   })
 
   /* `구 분` 칸이 고르는 목록. 이름만 있으면 되므로 이름만 꺼낸다 */
-  const { data: trades = [] } = useQuery({
-    queryKey: queryKeys.trades(projectId),
-    queryFn: () => getTrades(projectId),
-    select: (list) => list.map((trade) => trade.name).filter(Boolean),
+  const { data: workTypes = [] } = useQuery({
+    queryKey: queryKeys.workTypes(projectId),
+    queryFn: () => getWorkTypes(projectId),
+    select: (list) => list.map((workType) => workType.name).filter(Boolean),
   })
 
   /*
@@ -387,7 +387,7 @@ export function SheetPage() {
           {pager}
           <PhotoSheetGrid
             photos={current}
-            trades={trades}
+            workTypes={workTypes}
             onChange={edit}
             onLeave={leave}
             renderPhotoExtra={(photo) => (

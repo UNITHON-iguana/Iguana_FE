@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { Trade } from '@/types'
+import type { WorkType } from '@/types'
 
 /**
  * 공종 — 사진대지의 `구 분`이자 집계 품목의 뿌리.
@@ -18,17 +18,17 @@ function path(projectId: string): string {
   return `/api/v1/projects/${projectId}/worktypes`
 }
 
-export function getTrades(projectId: string): Promise<Trade[]> {
-  return api.get<Trade[]>(path(projectId))
+export function getWorkTypes(projectId: string): Promise<WorkType[]> {
+  return api.get<WorkType[]>(path(projectId))
 }
 
 /** 공종 하나를 만든다. 같은 프로젝트 안에서 이름이 겹치면 서버가 409로 거른다 */
-export function createTrade(projectId: string, name: string): Promise<Trade> {
-  return api.post<Trade>(path(projectId), { name })
+export function createWorkType(projectId: string, name: string): Promise<WorkType> {
+  return api.post<WorkType>(path(projectId), { name })
 }
 
-export interface BulkTradeResult {
-  created: Trade[]
+export interface BulkWorkTypeResult {
+  created: WorkType[]
   /** 이미 있거나 요청 안에서 겹쳐 건너뛴 이름. 에러가 아니라 결과다 */
   skippedDuplicateNames: string[]
 }
@@ -39,8 +39,8 @@ export interface BulkTradeResult {
  * 겹치는 이름은 에러 없이 건너뛰고 나머지만 등록된다.
  * 무엇이 빠졌는지는 `skippedDuplicateNames`가 알려주므로 화면이 그대로 옮겨 말한다.
  */
-export function createTrades(projectId: string, names: string[]): Promise<BulkTradeResult> {
-  return api.post<BulkTradeResult>(`${path(projectId)}/bulk`, {
+export function createWorkTypes(projectId: string, names: string[]): Promise<BulkWorkTypeResult> {
+  return api.post<BulkWorkTypeResult>(`${path(projectId)}/bulk`, {
     workTypes: names.map((name) => ({ name })),
   })
 }
@@ -49,8 +49,8 @@ export function createTrades(projectId: string, names: string[]): Promise<BulkTr
  * 공종을 지운다.
  *
  * **서버는 참조를 보고 막아주지 않는다.** 이미 이 공종을 쓴 사진이 있는지는
- * 부르는 쪽이 확인해야 한다(`TradesPage`의 `inUse`).
+ * 부르는 쪽이 확인해야 한다(`WorkTypesPage`의 `inUse`).
  */
-export function removeTrade(projectId: string, workTypeId: number): Promise<void> {
+export function removeWorkType(projectId: string, workTypeId: number): Promise<void> {
   return api.delete<void>(`${path(projectId)}/${workTypeId}`)
 }

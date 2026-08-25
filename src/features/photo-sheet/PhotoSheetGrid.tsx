@@ -107,7 +107,7 @@ export interface PhotoSheetGridProps {
    * 고를 수 있는 공종 이름들 — `구 분` 칸의 목록이 된다.
    * 목록에 없는 값이 이미 들어 있으면 그대로 보여준다. 옛 데이터를 지우지 않는다.
    */
-  trades: string[]
+  workTypes: string[]
   /** 값이 바뀐 사진 한 장을 통째로 돌려준다 */
   onChange: (photo: Photo) => void
   /**
@@ -140,7 +140,7 @@ export interface PhotoSheetGridProps {
  */
 export function PhotoSheetGrid({
   photos,
-  trades,
+  workTypes,
   onChange,
   onLeave,
   renderPhotoExtra,
@@ -343,7 +343,7 @@ export function PhotoSheetGrid({
     onPick: (next: string | null) => void,
   ) {
     // 목록에 없는 옛 값도 고를 수 있게 남겨둔다
-    const options = (value && !trades.includes(value) ? [value, ...trades] : trades).map(
+    const options = (value && !workTypes.includes(value) ? [value, ...workTypes] : workTypes).map(
       (name) => ({ value: name, label: name }),
     )
 

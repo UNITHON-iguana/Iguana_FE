@@ -6,7 +6,7 @@ import { PlanPage } from '@/pages/PlanPage'
 import { ProjectsPage } from '@/pages/ProjectsPage'
 import { SheetPage } from '@/pages/SheetPage'
 import { SummaryPage } from '@/pages/SummaryPage'
-import { TradesPage } from '@/pages/TradesPage'
+import { WorkTypesPage } from '@/pages/WorkTypesPage'
 
 export const router = createBrowserRouter([
   {
@@ -20,7 +20,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="sheet" replace /> },
           { path: 'sheet', element: <SheetPage /> },
           { path: 'summary', element: <SummaryPage /> },
-          { path: 'trades', element: <TradesPage /> },
+          { path: 'worktypes', element: <WorkTypesPage /> },
           { path: 'plan', element: <PlanPage /> },
 
           /*
@@ -33,6 +33,8 @@ export const router = createBrowserRouter([
           { path: 'review', element: <Navigate to="../sheet" replace /> },
           { path: 'compare', element: <Navigate to="../plan" replace /> },
           { path: 'export', element: <Navigate to="../sheet" replace /> },
+          // 공종을 `trades`로 부르던 시절의 경로
+          { path: 'trades', element: <Navigate to="../worktypes" replace /> },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

@@ -1,6 +1,6 @@
 import { delay } from '@/mocks/delay'
 import { photos } from '@/mocks/db'
-import { trades } from '@/mocks/trades'
+import { workTypes } from '@/mocks/workTypes'
 
 /**
  * 집계표 한 행.
@@ -65,7 +65,7 @@ function measure(spec: string | null, quantity: number) {
  * 규격을 가르는 것도 둘레로 환산하는 것도 서버가 한다 — 프론트는 받아서 그리기만 한다.
  */
 export function getAggregation(projectId: string, date?: string): Promise<Aggregation> {
-  const byTrade = new Map(trades.map((trade) => [trade.name, trade]))
+  const byWorkType = new Map(workTypes.map((workType) => [workType.name, workType]))
   const buckets = new Map<string, AggregationRow>()
   const dates = new Set<string>()
 
@@ -82,19 +82,19 @@ export function getAggregation(projectId: string, date?: string): Promise<Aggreg
     dates.add(workDate)
 
     for (const item of photo.workItems) {
-      const trade = item.category ? byTrade.get(item.category) : undefined
+      const workType = item.category ? byWorkType.get(item.category) : undefined
       // 등록되지 않은 공종은 서버가 세지 않는다
-      if (!trade) continue
+      if (!workType) continue
 
       for (const entry of item.entries) {
         if (!entry.spec && entry.quantity == null) continue
 
         const measured = measure(entry.spec, entry.quantity ?? 0)
-        const key = `${trade.id}:${measured.spec ?? ''}`
+        const key = `${workType.id}:${measured.spec ?? ''}`
 
         const row = buckets.get(key) ?? {
-          workTypeId: trade.id,
-          workTypeName: trade.name,
+          workTypeId: workType.id,
+          workTypeName: workType.name,
           spec: measured.spec,
           unit: measured.unit,
           quantityByDate: {},
@@ -108,7 +108,7 @@ export function getAggregation(projectId: string, date?: string): Promise<Aggreg
   }
 
   const sortedDates = [...dates].sort()
-  const order = trades.map((trade) => trade.id)
+  const order = workTypes.map((workType) => workType.id)
   const rows = [...buckets.values()]
     // 공종은 등록 순서대로, 같은 공종 안에서는 규격 순으로
     .sort(

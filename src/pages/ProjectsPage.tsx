@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router'
 
 import { createProject, getProjects } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
-import { createTrades } from '@/api/trades'
+import { createWorkTypes } from '@/api/workTypes'
 import { DataTable } from '@/components/DataTable'
 import type { Project } from '@/types'
 
@@ -17,7 +17,7 @@ interface ProjectFormValues {
   siteName: string
   period?: [Dayjs, Dayjs]
   /** 사진대지의 `구 분`으로 쓸 공종. 나중에 공종 화면에서 더할 수 있다 */
-  trades?: string[]
+  workTypes?: string[]
 }
 
 /** 폼 값을 API가 받는 모양으로 옮긴 것 — 기간 한 칸이 시작·종료 두 값으로 갈린다 */
@@ -26,7 +26,7 @@ interface CreateInput {
   siteName: string
   startDate: string | null
   endDate: string | null
-  trades: string[]
+  workTypes: string[]
 }
 
 export function ProjectsPage() {
@@ -49,14 +49,14 @@ export function ProjectsPage() {
    * 사람이 같은 프로젝트를 또 만든다. 그래서 결과를 갈라서 전한다.
    */
   const { mutate: create, isPending } = useMutation({
-    mutationFn: async ({ trades, ...input }: CreateInput) => {
+    mutationFn: async ({ workTypes, ...input }: CreateInput) => {
       const project = await createProject(input)
 
-      const names = trades.map((name) => name.trim()).filter(Boolean)
+      const names = workTypes.map((name) => name.trim()).filter(Boolean)
       if (names.length === 0) return { project, skipped: [], failed: false }
 
       try {
-        const { skippedDuplicateNames } = await createTrades(project.id, names)
+        const { skippedDuplicateNames } = await createWorkTypes(project.id, names)
         return { project, skipped: skippedDuplicateNames, failed: false }
       } catch {
         return { project, skipped: [], failed: true }
@@ -139,7 +139,7 @@ export function ProjectsPage() {
               siteName: values.siteName,
               startDate: values.period?.[0].format('YYYY-MM-DD') ?? null,
               endDate: values.period?.[1].format('YYYY-MM-DD') ?? null,
-              trades: values.trades ?? [],
+              workTypes: values.workTypes ?? [],
             })
           }
         >
@@ -167,8 +167,8 @@ export function ProjectsPage() {
             현장 사진을 먼저 올려보고 공종을 정하는 순서도 흔하다.
           */}
           <Form.Item label="공종" tooltip="사진대지에서 구분으로 고르게 됩니다">
-            <Form.List name="trades">
-              {(fields, { add: addTrade, remove: removeTrade }) => (
+            <Form.List name="workTypes">
+              {(fields, { add: addWorkType, remove: removeWorkType }) => (
                 <Flex vertical gap={8}>
                   {fields.map((field) => (
                     <Flex key={field.key} gap={8}>
@@ -178,13 +178,13 @@ export function ProjectsPage() {
                       <Button
                         type="text"
                         icon={<MinusCircleOutlined />}
-                        onClick={() => removeTrade(field.name)}
+                        onClick={() => removeWorkType(field.name)}
                         aria-label="공종 줄 지우기"
                       />
                     </Flex>
                   ))}
                   <div>
-                    <Button icon={<PlusOutlined />} onClick={() => addTrade('')}>
+                    <Button icon={<PlusOutlined />} onClick={() => addWorkType('')}>
                       공종 추가
                     </Button>
                   </div>

@@ -10,7 +10,7 @@ export const queryKeys = {
   /** 탭에 붙는 수와 작업일 선택지. 목록과 따로 받는다 */
   photoSummary: (projectId: string, workDate: string) =>
     ['photos', projectId, 'summary', workDate] as const,
-  trades: (projectId: string) => ['trades', projectId] as const,
+  workTypes: (projectId: string) => ['workTypes', projectId] as const,
   aggregation: (projectId: string) => ['aggregation', projectId] as const,
   photo: (photoId: string) => ['photo', photoId] as const,
   workComparison: (projectId: string) => ['comparison', 'work', projectId] as const,

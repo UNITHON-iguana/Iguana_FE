@@ -20,7 +20,7 @@ const { Header, Sider, Content } = Layout
 const PROJECT_MENU = [
   { key: 'sheet', label: '사진대지' },
   { key: 'summary', label: '집계' },
-  { key: 'trades', label: '공종', divided: true },
+  { key: 'worktypes', label: '공종', divided: true },
   { key: 'plan', label: '계획' },
 ]
 

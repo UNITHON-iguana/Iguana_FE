@@ -21,7 +21,7 @@ export function getProject(projectId: string): Promise<Project | undefined> {
  * 프로젝트를 만든다.
  *
  * **공종은 여기서 등록하지 않는다.** 프로젝트가 생긴 뒤에야 붙일 자리가 생기므로
- * 만들어진 id로 일괄 등록을 따로 부른다(`createTrades`). 둘을 한 함수로 묶으면
+ * 만들어진 id로 일괄 등록을 따로 부른다(`createWorkTypes`). 둘을 한 함수로 묶으면
  * 공종만 실패했을 때 프로젝트까지 실패한 것처럼 보인다.
  */
 export function createProject(input: ProjectInput): Promise<Project> {
