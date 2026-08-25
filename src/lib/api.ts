@@ -11,6 +11,16 @@ export class ApiError extends Error {
 }
 
 /**
+ * 서버가 밝힌 실패 이유. 없으면 부르는 쪽이 준비한 문장을 쓴다.
+ *
+ * 서버는 `"location: 위치는 필수입니다."`처럼 무엇을 하면 되는지까지 말해준다.
+ * 그걸 버리고 `다시 시도해주세요`로 덮으면 사람은 같은 실패를 그대로 반복한다.
+ */
+export function reason(error: unknown, fallback: string): string {
+  return error instanceof ApiError && error.message ? error.message : fallback
+}
+
+/**
  * 서버가 실패를 돌려주는 모양 — `{ code, message, timestamp }`.
  * 사람에게 보일 수 있는 건 `message` 하나뿐이라 그것만 꺼낸다.
  * JSON이 아니면 본문을 그대로 쓴다 — 게이트웨이가 낸 오류는 이 모양이 아니다.

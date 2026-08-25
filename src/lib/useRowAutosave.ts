@@ -20,13 +20,25 @@ interface Row {
  * `save`는 모듈 함수처럼 렌더마다 같은 참조여야 한다. 매번 새로 만들면
  * 정리 함수가 다시 걸리면서 저장이 앞당겨 나간다.
  */
-export function useRowAutosave<T extends Row>(save: (item: T) => Promise<unknown>) {
+export function useRowAutosave<T extends Row>(
+  save: (item: T) => Promise<unknown>,
+  onError?: (error: unknown, item: T) => void,
+) {
   const unsaved = useRef(new Map<string, T>())
+  /* 실패를 알리는 길. 저장은 렌더 밖에서 끝나므로 ref로 최신값을 쥔다 */
+  const report = useRef(onError)
+  useEffect(() => {
+    report.current = onError
+  })
 
   useEffect(() => {
     const pendingRows = unsaved.current
     return () => {
-      pendingRows.forEach((item) => void save(item))
+      pendingRows.forEach((item) => {
+        void save(item).catch(() => {
+          // 떠나는 길이라 알릴 화면이 없다. 조용히 흘려보내되 터뜨리지는 않는다
+        })
+      })
       pendingRows.clear()
     }
   }, [save])
@@ -41,7 +53,17 @@ export function useRowAutosave<T extends Row>(save: (item: T) => Promise<unknown
       const pending = unsaved.current.get(item.id)
       if (!pending) return
       unsaved.current.delete(item.id)
-      void save(pending)
+      void save(pending).catch((error: unknown) => {
+        /*
+         * 실패한 편집을 도로 붙든다.
+         *
+         * 화면에는 고친 값이 그대로 얹혀 있어서, 여기서 버리면 사람은 저장된 줄 알고
+         * 넘어간다. 붙들어 두면 다음에 그 줄에서 손을 뗄 때나 화면을 떠날 때 다시 나간다.
+         * 그 사이 같은 줄을 또 고쳤으면 그쪽이 최신이다 — 덮어쓰지 않는다.
+         */
+        if (!unsaved.current.has(pending.id)) unsaved.current.set(pending.id, pending)
+        report.current?.(error, pending)
+      })
     },
   }
 }

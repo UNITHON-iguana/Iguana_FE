@@ -5,12 +5,19 @@ import { Alert, App, Empty, Flex, Tabs, Tag, Typography } from 'antd'
 import { useParams } from 'react-router'
 
 import { getWorkComparison } from '@/api/comparison'
-import { addPlanWorkItem, getPlanWorkItems, removePlanWorkItem, savePlanWorkItem } from '@/api/plans'
+import {
+  addPlanWorkItem,
+  getPlanWorkItems,
+  planRowBlocker,
+  removePlanWorkItem,
+  savePlanWorkItem,
+} from '@/api/plans'
 import { queryKeys } from '@/api/queryKeys'
 import { getWorkTypes } from '@/api/workTypes'
 import { numberColumn } from '@/components/columns'
 import { DataTable } from '@/components/DataTable'
 import { PlanItemTable } from '@/features/plan/PlanItemTable'
+import { reason } from '@/lib/api'
 import { useRowAutosave } from '@/lib/useRowAutosave'
 import { COMPARE_STATUS_LABEL } from '@/lib/constants'
 import type { CompareStatus, ComparisonRow, PlanWorkItem } from '@/types'
@@ -54,7 +61,7 @@ export function PlanPage() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
-  /** 아직 서버에 없는 줄. 공종을 고르는 순간 등록되고 여기서 빠진다 */
+  /** 아직 서버에 없는 줄. 칸이 다 차고 손을 뗄 때 등록되고 여기서 빠진다 */
   const [drafts, setDrafts] = useState<PlanWorkItem[]>([])
   /** 서버 줄의 저장되지 않은 편집분. 서버 값 위에 덮어 쓴다 */
   const [edits, setEdits] = useState<Record<string, PlanWorkItem>>({})
@@ -87,6 +94,8 @@ export function PlanPage() {
   /* `useRowAutosave`는 렌더마다 같은 참조를 요구한다 — 매번 새로 만들면 저장이 앞당겨 나간다 */
   const save = useRowAutosave<PlanWorkItem>(
     useCallback((item: PlanWorkItem) => savePlanWorkItem(projectId, item), [projectId]),
+    // 실패한 편집은 훅이 도로 붙들어 둔다. 여기서는 왜 못 나갔는지만 밝힌다
+    (error) => message.error(reason(error, '줄을 저장하지 못했습니다. 잠시 뒤 다시 시도해주세요.')),
   )
 
   const { mutate: create } = useMutation({
@@ -108,7 +117,8 @@ export function PlanPage() {
       draftLatest.current.delete(sent.id)
       invalidate()
     },
-    onError: () => message.error('줄을 등록하지 못했습니다. 다시 시도해주세요.'),
+    onError: (error) =>
+      message.error(reason(error, '줄을 등록하지 못했습니다. 잠시 뒤 다시 시도해주세요.')),
     onSettled: (_data, _error, sent) => posting.current.delete(sent.id),
   })
 
@@ -119,11 +129,11 @@ export function PlanPage() {
   })
 
   /**
-   * 값이 바뀐 줄 하나.
+   * 값이 바뀐 줄 하나 — 화면에만 얹고 아무것도 보내지 않는다.
    *
-   * 서버에 있는 줄은 화면에만 얹어두고 그 줄에서 손을 뗄 때 보낸다(`onLeave`).
-   * 아직 없는 줄은 **공종이 정해지는 순간** 등록한다 — 서버가 공종을 필수로 받아
-   * 빈 줄을 먼저 만들어둘 수 없기 때문이다. 그 전까지는 화면에만 있다.
+   * 이 함수는 글자 한 자마다 불린다. 여기서 보내면 `지하2층`을 치는 동안 요청이
+   * 다섯 번 나가고, 실패하는 줄이면 실패도 다섯 번 알린다.
+   * 보내는 시점은 그 줄에서 손을 뗄 때 하나다(`leave`).
    */
   function change(item: PlanWorkItem) {
     if (!item.id.startsWith(NEW_ROW)) {
@@ -133,12 +143,40 @@ export function PlanPage() {
     }
 
     setDrafts((prev) => prev.map((draft) => (draft.id === item.id ? item : draft)))
+    // 등록이 도는 동안 이어 친 값도 잃지 않게 마지막 값을 쥔다
     draftLatest.current.set(item.id, item)
+  }
 
-    if (item.workTypeId != null && !posting.current.has(item.id)) {
-      posting.current.add(item.id)
-      create(item)
+  /**
+   * 그 줄에서 손을 뗐다 — 값이 여문 시점이다.
+   *
+   * 서버에 있는 줄은 고친 것이 있으면 지금 보낸다.
+   * 아직 없는 줄은 **다섯 칸이 다 찼을 때** 등록한다 — 서버가 위치·작업내용·수량·단위를
+   * 공종과 함께 전부 필수로 받아서(`planRowBlocker`), 공종만 고른 줄을 보내면 400이다.
+   * 덜 찬 줄은 조용히 화면에 남는다. 무엇이 모자란지는 줄 앞의 표시가 말한다.
+   */
+  function leave(item: PlanWorkItem) {
+    if (!item.id.startsWith(NEW_ROW)) {
+      save.leave(item)
+      return
     }
+    if (planRowBlocker(item) || posting.current.has(item.id)) return
+    posting.current.add(item.id)
+    create(item)
+  }
+
+  /**
+   * 이 줄이 아직 서버에 닿지 못하는 이유. 없으면 null.
+   *
+   * 화면에 값이 보이는 것과 서버에 저장된 것은 다르다. 등록이든 수정이든 같은 조건에서
+   * 400이라, 이미 등록된 줄에서 위치를 지운 경우에도 똑같이 알린다.
+   */
+  function warning(item: PlanWorkItem): string | null {
+    const blocker = planRowBlocker(item)
+    if (!blocker) return null
+    return item.id.startsWith(NEW_ROW)
+      ? `아직 등록되지 않았습니다 — ${blocker}`
+      : `이대로는 저장되지 않습니다 — ${blocker}`
   }
 
   function removeRow(id: string) {
@@ -206,7 +244,8 @@ export function PlanPage() {
                 loading={isLoading}
                 emptyText="계획 공정이 없습니다. 줄 추가로 입력하세요."
                 onChange={change}
-                onLeave={save.leave}
+                onLeave={leave}
+                warning={warning}
                 onRemove={removeRow}
                 onAdd={addRow}
               />

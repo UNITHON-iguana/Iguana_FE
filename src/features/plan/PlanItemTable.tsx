@@ -1,5 +1,5 @@
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Empty, Flex, Input, InputNumber, Popconfirm, Select } from 'antd'
+import { DeleteOutlined, ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Empty, Flex, Input, InputNumber, Popconfirm, Select, Tooltip, theme } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 
 import { DataTable } from '@/components/DataTable'
@@ -15,6 +15,13 @@ export interface PlanItemTableProps {
   onChange: (item: PlanWorkItem) => void
   /** 그 줄에서 포커스가 나갔다 — 값이 여문 시점이라 여기서 저장한다 */
   onLeave: (item: PlanWorkItem) => void
+  /**
+   * 이 줄이 아직 서버에 닿지 못하는 이유. 없으면 null.
+   *
+   * 서버가 다섯 칸을 모두 필수로 받아서, 덜 찬 줄은 화면에만 있고 저장되지 않는다.
+   * 그 어긋남을 줄 앞에 세워두지 않으면 사람은 다 적었다고 믿고 넘어간다.
+   */
+  warning: (item: PlanWorkItem) => string | null
   onRemove: (id: string) => void
   onAdd: () => void
   emptyText: string
@@ -32,6 +39,9 @@ export interface PlanItemTableProps {
  *
  * **공종만 고르는 칸이다.** 사진대지 `구 분`과 같은 목록에서 고른다 —
  * 자유 입력이면 등록되지 않은 이름이 들어와 계획 대비 현황에서 짝을 못 찾는다.
+ *
+ * **타이핑 중에는 아무것도 보내지 않는다.** `onChange`는 화면에 얹기만 하고,
+ * 서버로 나가는 것은 그 줄에서 포커스가 빠질 때 한 번이다(`onLeave`).
  */
 export function PlanItemTable({
   items,
@@ -41,8 +51,11 @@ export function PlanItemTable({
   onLeave,
   onRemove,
   onAdd,
+  warning,
   emptyText,
 }: PlanItemTableProps) {
+  const { token } = theme.useToken()
+
   /** 글자 칸 하나 */
   function textCell(
     key: 'location' | 'description' | 'unit',
@@ -69,6 +82,28 @@ export function PlanItemTable({
         onRow={(row) => rowLeaveProps(row, onLeave)}
         locale={{ emptyText: <Empty description={emptyText} /> }}
         columns={[
+          {
+            /*
+             * 줄 상태만 세우는 칸. 엑셀의 행 머리처럼 값이 아니라 그 줄의 사정을 알린다.
+             * 저장된 줄은 비어 있어 눈에 걸리지 않는다.
+             */
+            title: '',
+            width: 32,
+            align: 'center',
+            render: (_, row) => {
+              const note = warning(row)
+              if (!note) return null
+              return (
+                <Tooltip title={note}>
+                  <ExclamationCircleOutlined
+                    role="img"
+                    aria-label={note}
+                    style={{ color: token.colorWarning }}
+                  />
+                </Tooltip>
+              )
+            },
+          },
           {
             title: '위치',
             dataIndex: 'location',
