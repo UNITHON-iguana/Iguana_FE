@@ -3,6 +3,7 @@ import { Button, Empty, Flex, Input, InputNumber, Popconfirm } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 
 import { DataTable } from '@/components/DataTable'
+import { rowLeaveProps } from '@/lib/useRowAutosave'
 import type { PlanItemBase } from '@/types'
 
 export interface PlanItemTableProps<T extends PlanItemBase> {
@@ -13,6 +14,8 @@ export interface PlanItemTableProps<T extends PlanItemBase> {
   nameTitle: string
   /** 값이 바뀐 줄 하나를 통째로 돌려준다 */
   onChange: (item: T) => void
+  /** 그 줄에서 포커스가 나갔다 — 값이 여문 시점이라 여기서 저장한다 */
+  onLeave: (item: T) => void
   onRemove: (id: string) => void
   onAdd: () => void
   adding?: boolean
@@ -35,6 +38,7 @@ export function PlanItemTable<T extends PlanItemBase>({
   nameKey,
   nameTitle,
   onChange,
+  onLeave,
   onRemove,
   onAdd,
   adding,
@@ -59,6 +63,8 @@ export function PlanItemTable<T extends PlanItemBase>({
         rowKey="id"
         loading={loading}
         dataSource={items}
+        // 줄에서 손을 뗄 때 저장한다 — 타이핑 중에는 아무것도 보내지 않는다
+        onRow={(row) => rowLeaveProps(row, onLeave)}
         locale={{ emptyText: <Empty description={emptyText} /> }}
         columns={[
           {

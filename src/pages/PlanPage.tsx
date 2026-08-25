@@ -195,8 +195,9 @@ export function PlanPage() {
                 emptyText="계획 공정이 없습니다. 줄 추가로 입력하세요."
                 onChange={(item) => {
                   setWorkDrafts((prev) => ({ ...prev, [item.id]: item }))
-                  saveWork(item)
+                  saveWork.edit(item)
                 }}
+                onLeave={saveWork.leave}
                 onRemove={removeWork}
                 onAdd={addWork}
                 adding={addingWork}
@@ -215,8 +216,9 @@ export function PlanPage() {
                 emptyText="계획 자재가 없습니다. 줄 추가로 입력하세요."
                 onChange={(item) => {
                   setMaterialDrafts((prev) => ({ ...prev, [item.id]: item }))
-                  saveMaterial(item)
+                  saveMaterial.edit(item)
                 }}
+                onLeave={saveMaterial.leave}
                 onRemove={removeMaterial}
                 onAdd={addMaterial}
                 adding={addingMaterial}

@@ -7,7 +7,7 @@ import { getAggregation } from '@/api/aggregation'
 import { queryKeys } from '@/api/queryKeys'
 import { addTrade, getTrades, removeTrade, saveTrade } from '@/api/trades'
 import { DataTable } from '@/components/DataTable'
-import { useRowAutosave } from '@/lib/useRowAutosave'
+import { rowLeaveProps, useRowAutosave } from '@/lib/useRowAutosave'
 import type { Trade } from '@/types'
 
 /** 이름이 겹치는지 비교하기 전에 공백을 없앤다 — 사람이 친 값이다 */
@@ -68,12 +68,12 @@ export function TradesPage() {
     onError: () => message.error('공종을 지우지 못했습니다. 다시 시도해주세요.'),
   })
 
-  /** 편집분을 바로 화면에 반영하고 저장은 예약한다 */
+  /** 편집분을 바로 화면에 반영한다. 서버로는 그 줄에서 손을 뗄 때 나간다 */
   function edit(trade: Trade) {
     queryClient.setQueryData<Trade[]>(queryKeys.trades(projectId), (prev) =>
       prev?.map((item) => (item.id === trade.id ? trade : item)),
     )
-    autosave(trade)
+    autosave.edit(trade)
   }
 
   /** 이름이 두 번 이상 나오는 공종 */
@@ -117,6 +117,9 @@ export function TradesPage() {
         rowKey="id"
         loading={isLoading}
         dataSource={trades}
+        // 줄에서 손을 뗄 때 저장한다 — 이름을 치는 도중에 반쯤 친 값이 올라가면
+        // 그 이름으로 묶인 집계가 잠깐씩 보인다
+        onRow={(row) => rowLeaveProps(row, autosave.leave)}
         locale={{
           emptyText: <Empty description="등록된 공종이 없습니다. 공종 추가로 입력하세요." />,
         }}
