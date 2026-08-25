@@ -49,6 +49,7 @@ export function photoUncertainCount(photo: Photo): number {
  * 사람 눈에는 멀쩡한 사진이 집계에서만 조용히 빠지는 일이 생긴다.
  */
 export function confirmBlocker(photo: Photo): string | null {
+  // 서버가 확정을 받아주지 않는 조건과 같아야 한다. 어긋나면 반영에서 400이 돌아온다
   if (photo.status === 'uploading' || photo.status === 'analyzing') {
     return '분석이 끝나면 검수할 수 있습니다'
   }
@@ -60,6 +61,16 @@ export function confirmBlocker(photo: Photo): string | null {
   // 작업일이 없으면 집계가 어느 열에도 못 넣는다. 확정 전에 받아둔다
   if (!photo.workDate) return '작업일을 채워주세요'
   return null
+}
+
+/**
+ * 사람이 봐야 하는 사진 — 지금 이대로는 반영할 수 없는 사진.
+ *
+ * 서버도 같은 뜻의 `needsReview`를 사진마다 들고 온다.
+ * 붙일 때 이 함수는 그 값을 읽는 자리로 바뀐다 — 판정 자체가 서버 몫이기 때문이다.
+ */
+export function needsReview(photo: Photo): boolean {
+  return confirmBlocker(photo) !== null
 }
 
 /**

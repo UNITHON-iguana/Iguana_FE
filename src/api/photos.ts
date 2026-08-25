@@ -1,8 +1,8 @@
-import { confirmBlocker } from '@/lib/workItems'
+import { confirmBlocker, hasContent, needsReview } from '@/lib/workItems'
 import { photos } from '@/mocks/db'
 import { delay } from '@/mocks/delay'
 import { placeholderImage } from '@/mocks/placeholder'
-import type { Photo, WorkItem } from '@/types'
+import type { Photo } from '@/types'
 
 /**
  * 프로젝트의 사진 전부.
@@ -21,11 +21,22 @@ export function getPhotos(projectId: string): Promise<Photo[]> {
  */
 export type WorkDateFilter = 'all' | 'undated' | (string & {})
 
+/**
+ * 목록에 담을 사진.
+ *
+ * 화면이 두 탭으로 갈리고 이 값이 곧 그 탭이다.
+ * `review`는 확인할 칸이 남아 손을 봐야 하는 사진, `sheet`는 손볼 것이 없는 사진대지다.
+ * 두 쪽은 겹치지 않고, 둘을 합치면 분석이 끝난 사진 전부다.
+ *
+ * **`sheet` 쪽이 곧 실적이다.** AI가 다 맞춘 사진은 사람 승인 없이 그대로 집계에
+ * 들어가고, 사람이 값을 고친 사진만 확정 API를 타고 서버에 올라간다.
+ */
+export type PhotoScope = 'review' | 'sheet'
+
 export interface PhotoQuery {
   projectId: string
   workDate: WorkDateFilter
-  /** 확인이 필요한 사진만 */
-  needsReview: boolean
+  scope: PhotoScope
   /** 1부터 */
   page: number
   size: number
@@ -34,19 +45,18 @@ export interface PhotoQuery {
 /**
  * 진행 상황 카운트.
  *
- * **작업일 필터까지만 적용한다.** `needsReview`와 페이지는 무시한다 —
- * 머리글은 '지금 보고 있는 30장'이 아니라 '이 날 전체가 얼마나 끝났나'를 말해야 한다.
+ * **작업일 필터까지만 적용한다.** `scope`와 페이지는 무시한다 —
+ * 탭 이름에 붙는 수라 '지금 보고 있는 30장'이 아니라 '이 날 전체가 얼마나 끝났나'를 말한다.
  */
 export interface PhotoCounts {
   photos: number
   /** 아직 업로드·분석 중이라 표에 올릴 칸이 없는 사진 */
   inProgress: number
   failed: number
-  confirmed: number
-  /** 아직 확정할 수 없는 사진 — 이만큼이 집계와 내보내기에서 빠져 있다 */
+  /** 확인할 칸이 남아 검수 탭에 있는 사진 */
   needsReview: number
-  /** 확인할 칸이 없고 아직 검수도 안 한 사진 — 한 번에 넘길 수 있다 */
-  clearPending: number
+  /** 손볼 것이 없어 사진대지 탭에 있는 사진. 집계와 내보내기가 세는 것도 이것이다 */
+  sheet: number
 }
 
 /** 작업일 선택지 한 줄. `workDate`가 null이면 작업일이 비어 있는 사진 */
@@ -61,18 +71,12 @@ export interface PhotoPage {
   total: number
   page: number
   size: number
-  counts: PhotoCounts
-  workDates: WorkDateOption[]
 }
 
-/**
- * 사람이 봐야 하는 사진 — 지금 이대로는 검수 완료로 넘길 수 없는 사진.
- *
- * 확정된 사진만 집계와 내보내기에 들어가므로 이 목록이 곧 '아직 실적이 아닌 사진'이다.
- * 확인 필요 필터·일괄 확정·자동 확정이 모두 같은 기준(`confirmBlocker`)을 쓴다.
- */
-function needsEye(photo: Photo): boolean {
-  return confirmBlocker(photo) !== null
+/** 목록과 상관없이 화면 틀이 먼저 알아야 하는 값 */
+export interface PhotoSummary {
+  counts: PhotoCounts
+  workDates: WorkDateOption[]
 }
 
 /** 표에 올릴 수 있는 사진 — 분석이 끝났거나 실패한 것 */
@@ -86,6 +90,47 @@ function matchesWorkDate(photo: Photo, filter: WorkDateFilter): boolean {
   return photo.workDate === filter
 }
 
+/** 확인할 칸이 남았는지가 곧 탭이다 */
+function inScope(photo: Photo, scope: PhotoScope): boolean {
+  return scope === 'review' ? needsReview(photo) : !needsReview(photo)
+}
+
+/**
+ * 화면 틀이 쓰는 값 — 탭에 붙는 수와 작업일 선택지.
+ *
+ * **목록과 따로 준다.** 손볼 사진이 있으면 검수 탭으로, 없으면 사진대지 탭으로 여는데,
+ * 이 값이 목록에 딸려 오면 목록을 받아야 탭이 정해지고 탭이 정해져야 목록을 받는
+ * 순환이 된다. 진행 상황을 물어보는 자리이기도 해서 분석 중에는 여기만 다시 부른다.
+ */
+export function getPhotoSummary(
+  projectId: string,
+  workDate: WorkDateFilter,
+): Promise<PhotoSummary> {
+  const all = photos.filter((p) => p.projectId === projectId)
+
+  const byDate = new Map<string | null, number>()
+  for (const photo of all) {
+    byDate.set(photo.workDate, (byDate.get(photo.workDate) ?? 0) + 1)
+  }
+  const workDates: WorkDateOption[] = [...byDate.entries()]
+    .map(([date, count]) => ({ workDate: date, photos: count }))
+    // 최근 작업일이 위로. 작업일이 빈 것은 맨 아래에 둔다
+    .sort((a, b) => (b.workDate ?? '').localeCompare(a.workDate ?? ''))
+
+  const inDate = all.filter((photo) => matchesWorkDate(photo, workDate))
+  const settled = inDate.filter(isSettled)
+
+  const counts: PhotoCounts = {
+    photos: inDate.length,
+    inProgress: inDate.length - settled.length,
+    failed: inDate.filter((p) => p.status === 'failed').length,
+    needsReview: settled.filter((p) => inScope(p, 'review')).length,
+    sheet: settled.filter((p) => inScope(p, 'sheet')).length,
+  }
+
+  return delay({ counts, workDates })
+}
+
 /**
  * 사진 목록 한 페이지.
  *
@@ -94,32 +139,12 @@ function matchesWorkDate(photo: Photo, filter: WorkDateFilter): boolean {
  * 백엔드가 붙으면 이 함수 안쪽만 바뀌고 화면은 그대로다.
  */
 export function getPhotoPage(query: PhotoQuery): Promise<PhotoPage> {
-  const all = photos.filter((p) => p.projectId === query.projectId)
+  const filtered = photos
+    .filter((p) => p.projectId === query.projectId)
+    .filter((p) => matchesWorkDate(p, query.workDate))
+    .filter(isSettled)
+    .filter((p) => inScope(p, query.scope))
 
-  const byDate = new Map<string | null, number>()
-  for (const photo of all) {
-    byDate.set(photo.workDate, (byDate.get(photo.workDate) ?? 0) + 1)
-  }
-  const workDates: WorkDateOption[] = [...byDate.entries()]
-    .map(([workDate, count]) => ({ workDate, photos: count }))
-    // 최근 작업일이 위로. 작업일이 빈 것은 맨 아래에 둔다
-    .sort((a, b) => (b.workDate ?? '').localeCompare(a.workDate ?? ''))
-
-  const inDate = all.filter((photo) => matchesWorkDate(photo, query.workDate))
-  const settled = inDate.filter(isSettled)
-
-  const counts: PhotoCounts = {
-    photos: inDate.length,
-    inProgress: inDate.length - settled.length,
-    failed: inDate.filter((p) => p.status === 'failed').length,
-    confirmed: inDate.filter((p) => p.reviewStatus === 'confirmed').length,
-    needsReview: settled.filter(needsEye).length,
-    clearPending: inDate.filter(
-      (p) => p.status === 'analyzed' && p.reviewStatus === 'pending' && !needsEye(p),
-    ).length,
-  }
-
-  const filtered = query.needsReview ? settled.filter(needsEye) : settled
   const start = (query.page - 1) * query.size
 
   return delay({
@@ -127,30 +152,7 @@ export function getPhotoPage(query: PhotoQuery): Promise<PhotoPage> {
     total: filtered.length,
     page: query.page,
     size: query.size,
-    counts,
-    workDates,
   })
-}
-
-/**
- * 확인할 칸이 없는 사진을 한 번에 검수 완료로 넘긴다.
- *
- * 화면에 올라온 30장이 아니라 **조건에 걸린 전부**가 대상이라 서버가 할 일이다.
- * 프론트에서 돌면 페이지에 없는 사진은 넘어가지 않는다.
- */
-export function confirmClearPhotos(projectId: string, workDate: WorkDateFilter): Promise<number> {
-  const targets = photos.filter(
-    (p) =>
-      p.projectId === projectId &&
-      matchesWorkDate(p, workDate) &&
-      p.status === 'analyzed' &&
-      p.reviewStatus === 'pending' &&
-      !needsEye(p),
-  )
-  targets.forEach((photo) => {
-    photo.reviewStatus = 'confirmed'
-  })
-  return delay(targets.length, 300)
 }
 
 export function getPhoto(photoId: string): Promise<Photo | undefined> {
@@ -255,10 +257,10 @@ export function startAnalysis(projectId: string): Promise<void> {
           },
         ]
         /*
-         * 확인할 칸이 없으면 사람 손을 기다리지 않고 바로 확정한다.
-         * 검수는 AI가 자신 없어 한 사진에만 하는 일이고, 나머지는 올린 즉시 실적이 된다.
+         * 분석만으로는 확정되지 않는다 — 확정은 사람이 반영을 눌러야 일어난다.
+         * 확인할 칸이 없는 사진도 마찬가지라, 그런 사진은 사진대지 탭에 반영 대기로 쌓인다.
          */
-        photo.reviewStatus = confirmBlocker(photo) === null ? 'confirmed' : 'pending'
+        photo.reviewStatus = 'pending'
       },
       1500 + index * 1200,
     )
@@ -267,22 +269,38 @@ export function startAnalysis(projectId: string): Promise<void> {
   return delay(undefined, 200)
 }
 
-export interface PhotoReviewInput {
-  workDate: string | null
-  location: string | null
-  workItems: WorkItem[]
-  reviewStatus: Photo['reviewStatus']
-  /*
-   * 확인 필요 표시도 함께 저장한다.
-   * 사람이 고쳐서 지운 표시가 저장되지 않으면 다시 불러올 때 노란 칸이 되살아난다.
-   */
-  uncertain: Photo['uncertain']
-}
+/**
+ * 사진 한 장 확정 — `PATCH /api/v1/photo-uploads/{id}`.
+ *
+ * 그 사진에 딸린 **항목 전부**를 함께 보내고, 성공하면 사진이 통째로 확정된다
+ * (`status: CONFIRMED`). 공종이 비어 있는 항목이 하나라도 있으면 400이라
+ * 여기서도 같은 조건으로 막는다(`confirmBlocker`).
+ *
+ * **사람이 값을 고친 사진만 이 호출을 탄다.** AI가 다 맞춘 사진은 승인이 필요 없어
+ * 아무도 부르지 않는다 — 그래서 하루 수백 장이 올라와도 호출은 사람이 고친 만큼이고,
+ * 그때그때 한 장씩 흩어져 나간다.
+ *
+ * **값만 저장하는 자리는 없다.** 확인할 칸이 남아 아직 못 보낸 사진의 편집분은
+ * 브라우저에만 있다.
+ */
+export function confirmPhoto(photo: Photo): Promise<Photo> {
+  const found = photos.find((p) => p.id === photo.id)
+  if (!found) throw new Error('사진을 찾을 수 없습니다')
 
-export function savePhotoReview(photoId: string, input: PhotoReviewInput): Promise<Photo> {
-  const photo = photos.find((p) => p.id === photoId)
-  if (!photo) throw new Error('사진을 찾을 수 없습니다')
+  const blocker = confirmBlocker(photo)
+  if (blocker) throw new Error(blocker)
 
-  Object.assign(photo, input)
-  return delay({ ...photo }, 400)
+  Object.assign(found, {
+    workDate: photo.workDate,
+    location: photo.location,
+    // 양식을 채우려고 만든 빈 줄은 보내지 않는다
+    workItems: photo.workItems.filter(hasContent),
+    /*
+     * 확인 필요 표시도 함께 넘긴다.
+     * 사람이 고쳐서 지운 표시가 남아 있으면 다시 불러올 때 노란 칸이 되살아난다.
+     */
+    uncertain: photo.uncertain,
+    reviewStatus: 'confirmed' as const,
+  })
+  return delay({ ...found }, 200)
 }

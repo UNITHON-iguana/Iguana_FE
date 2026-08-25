@@ -182,3 +182,11 @@
 .workDate {
   padding: 2px 1px;
 }
+
+/*
+ * 공종 드롭다운이 앉는 칸.
+ * 셀 자체가 격자를 그리므로 안쪽 여백만 맞추고 테두리는 두지 않는다.
+ */
+.selectCell {
+  padding: 0 2px;
+}

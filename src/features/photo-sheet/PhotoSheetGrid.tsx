@@ -2,12 +2,12 @@ import { Fragment, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, DatePicker, Image } from 'antd'
+import { Button, DatePicker, Image, Select } from 'antd'
 import dayjs from 'dayjs'
 
 import { HEADER_BG, SHEET_CATEGORY_BG, SHEET_SEQ_COLOR } from '@/app/theme'
 import { DEFAULT_WORK_ITEM_ROWS, SHEET_ENTRY_SLOTS } from '@/lib/constants'
-import { splitToFormRows } from '@/lib/workItems'
+import { hasContent, splitToFormRows } from '@/lib/workItems'
 import type { Photo, Uncertain, WorkEntry, WorkItem } from '@/types'
 
 import styles from './PhotoSheetGrid.module.css'
@@ -17,6 +17,9 @@ import styles from './PhotoSheetGrid.module.css'
  * Tab과 좌우 방향키가 이 순서를 따른다.
  */
 const LAST_COL = SHEET_ENTRY_SLOTS * 2
+
+/** 양식을 채우려고 화면이 깐 빈 줄의 id 표시 */
+const BLANK_ROW = '__blank'
 
 /** 사진 아래 '위 치' 줄은 칸이 하나뿐이다 */
 const LOCATION_COL = 0
@@ -80,17 +83,40 @@ function withFormSlots(photo: Photo): WorkItem[] {
   return [
     ...items,
     /*
-     * 빈 줄의 id를 사진 id에서 만들어 렌더마다 같은 값이 나오게 한다.
-     * 매번 새 id를 만들면 React가 다른 줄로 보고, 입력 중이던 칸의 포커스가 날아간다.
+     * 빈 줄의 id를 사진 id와 **화면에서의 줄 번호**로 만든다.
+     * 사진 id에서 만드는 것은 렌더마다 같은 값이 나오게 하려는 것이다 —
+     * 매번 새 id를 만들면 React가 다른 줄로 보고 입력 중이던 칸의 포커스가 날아간다.
+     * 줄 번호를 쓰는 것은 빈 줄에 값을 쳐서 진짜 항목이 된 뒤에도 겹치지 않게 하려는
+     * 것이다. 0부터 다시 세면 이미 올라간 줄과 같은 id가 나오고, 같은 key를 단 줄이
+     * 둘이면 React가 표를 엉뚱하게 짜맞춘다.
      */
-    ...Array.from({ length: padding }, (_, i) => emptyItem(`${photo.id}__blank${i}`)),
+    ...Array.from({ length: padding }, (_, i) =>
+      emptyItem(`${photo.id}${BLANK_ROW}${items.length + i}`),
+    ),
   ]
+}
+
+/** 화면이 만든 빈 줄인가 — 사람이 값을 치기 전까지는 사진에 붙지 않는다 */
+function isBlankRow(photo: Photo, item: WorkItem): boolean {
+  return item.id.startsWith(`${photo.id}${BLANK_ROW}`) && !hasContent(item)
 }
 
 export interface PhotoSheetGridProps {
   photos: Photo[]
+  /**
+   * 고를 수 있는 공종 이름들 — `구 분` 칸의 목록이 된다.
+   * 목록에 없는 값이 이미 들어 있으면 그대로 보여준다. 옛 데이터를 지우지 않는다.
+   */
+  trades: string[]
   /** 값이 바뀐 사진 한 장을 통째로 돌려준다 */
   onChange: (photo: Photo) => void
+  /**
+   * 포커스가 이 사진 밖으로 나갔다 — 값이 다 여문 시점이다.
+   *
+   * 엑셀이 칸을 벗어날 때 값을 확정하는 것과 같다. 저장이 사진 단위라 칸이 아니라
+   * 사진을 기준으로 잡는다 — 같은 사진 안에서 칸을 오가는 동안은 부르지 않는다.
+   */
+  onLeave?: (photo: Photo) => void
   /** 사진 칸 아래에 붙일 것 — 검수 체크박스처럼 양식 바깥의 도구는 부모가 넣는다 */
   renderPhotoExtra?: (photo: Photo) => ReactNode
 }
@@ -112,7 +138,13 @@ export interface PhotoSheetGridProps {
  * 이 표에 정렬이나 페이지네이션을 붙이면 data-row 인덱스와 화면 줄이 어긋나
  * 방향키가 엉뚱한 칸으로 간다. 사진 목록을 자를 때는 photos를 미리 잘라서 넘긴다.
  */
-export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoSheetGridProps) {
+export function PhotoSheetGrid({
+  photos,
+  trades,
+  onChange,
+  onLeave,
+  renderPhotoExtra,
+}: PhotoSheetGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   /*
@@ -142,9 +174,18 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
     return row.kind === 'item' ? LAST_COL : LOCATION_COL
   }
 
+  /**
+   * 칸 하나에 포커스를 준다.
+   *
+   * 좌표는 입력칸 자신이 아니라 감싸는 요소에 붙어 있을 수도 있다 —
+   * `구 분`은 antd `Select`라 우리가 만든 input이 없어서 바깥에 좌표를 붙인다.
+   */
   function focusCell(row: number, col: number) {
-    const selector = `input[data-row="${row}"][data-col="${col}"]`
-    containerRef.current?.querySelector<HTMLInputElement>(selector)?.focus()
+    const cell = containerRef.current?.querySelector<HTMLElement>(
+      `[data-row="${row}"][data-col="${col}"]`,
+    )
+    const input = cell instanceof HTMLInputElement ? cell : cell?.querySelector('input')
+    input?.focus()
   }
 
   function moveVertical(row: number, col: number, delta: number) {
@@ -172,8 +213,22 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
      */
     if (event.nativeEvent.isComposing) return
 
-    const row = Number(target.dataset.row)
-    const col = Number(target.dataset.col)
+    /*
+     * 공종 칸에서는 방향키와 Enter를 antd에게 통째로 넘긴다.
+     *
+     * `Select`는 포커스만 있으면 위아래를 무조건 가져간다 — 닫혀 있으면 목록을 열고
+     * 열려 있으면 항목을 오르내린다. 우리가 같은 키로 칸을 옮기려 들면 둘이 겹쳐
+     * 목록이 열린 채 포커스만 옆으로 새는 상태가 된다.
+     *
+     * 그래서 이 칸만 규칙이 다르다. **칸을 벗어날 때는 Tab을 쓴다** —
+     * antd가 건드리지 않는 유일한 이동 키다. 목록에서 고르는 이득이 더 크다고 보고
+     * 방향키 이동을 포기한 자리다.
+     */
+    if (target.closest('.ant-select')) return
+
+    const cell = target.closest<HTMLElement>('[data-row][data-col]')
+    const row = Number(cell?.dataset.row)
+    const col = Number(cell?.dataset.col)
     if (Number.isNaN(row) || Number.isNaN(col)) return
 
     const key = event.key
@@ -215,10 +270,14 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
 
   /**
    * 사진 한 장의 작업 항목을 통째로 돌려준다.
-   * 양식을 채우려고 만든 빈 줄도 함께 넘어간다 — 저장하는 쪽에서 걸러낸다.
+   *
+   * 값이 들어간 빈 줄은 그대로 넘긴다 — 그 순간 진짜 항목이 된다.
+   * 아직 비어 있는 빈 줄은 넘기지 않는다. 넘기면 화면이 깔아준 줄이 사진에 눌러앉고,
+   * 다음 렌더에서 그 자리에 다시 빈 줄이 깔려 줄이 계속 불어난다.
    */
   function commitItems(photoIndex: number, items: WorkItem[]) {
-    onChange({ ...photos[photoIndex], workItems: items })
+    const photo = photos[photoIndex]
+    onChange({ ...photo, workItems: items.filter((item) => !isBlankRow(photo, item)) })
   }
 
   function updateItem(photoIndex: number, itemId: string, patch: Partial<WorkItem>) {
@@ -270,6 +329,41 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
     )
   }
 
+  /**
+   * 공종 칸 하나.
+   *
+   * 자유 입력이 아니라 등록된 공종에서 고른다 — 오타 하나로 집계에서 빠지던 자리다.
+   * 좌표는 감싸는 div에 붙인다. antd `Select`의 input은 우리가 만드는 게 아니라
+   * 거기에 직접 붙일 수 없기 때문이다.
+   */
+  function categoryCell(
+    row: number,
+    col: number,
+    value: string | null,
+    onPick: (next: string | null) => void,
+  ) {
+    // 목록에 없는 옛 값도 고를 수 있게 남겨둔다
+    const options = (value && !trades.includes(value) ? [value, ...trades] : trades).map(
+      (name) => ({ value: name, label: name }),
+    )
+
+    return (
+      <div data-row={row} data-col={col} className={styles.selectCell}>
+        <Select
+          variant="borderless"
+          size="small"
+          showSearch
+          allowClear
+          placeholder="공종 선택"
+          style={{ width: '100%' }}
+          value={value}
+          options={options}
+          onChange={(next: string | null) => onPick(next ?? null)}
+        />
+      </div>
+    )
+  }
+
   /** 수량 칸 하나 — 입력 중인 소수점을 지키느라 텍스트 칸과 따로 둔다 */
   function numberCell(
     row: number,
@@ -315,7 +409,19 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
           const firstRow = firstRowOf[photoIndex]
 
           return (
-            <tbody key={photo.id}>
+            <tbody
+              key={photo.id}
+              /*
+               * React의 onBlur는 focusout이라 사진 덩어리 전체의 포커스 이동이 여기로 온다.
+               * 옮겨간 자리가 이 사진 안이면 아직 이 사진을 보고 있는 것이다.
+               * 밖(다음 사진·표 바깥·창 밖)이면 이 사진은 끝났다.
+               */
+              onBlur={(event) => {
+                const next = event.relatedTarget as Node | null
+                if (next && event.currentTarget.contains(next)) return
+                onLeave?.(photo)
+              }}
+            >
               {items.map((item, itemIndex) => {
                 const row = firstRow + itemIndex
                 const categoryFlag = item.uncertain?.category
@@ -415,7 +521,7 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
                       style={categoryFlag ? undefined : { background: SHEET_CATEGORY_BG }}
                       title={categoryFlag}
                     >
-                      {textCell(row, 0, item.category, (next) =>
+                      {categoryCell(row, 0, item.category, (next) =>
                         updateItem(photoIndex, item.id, {
                           category: next,
                           uncertain: without(item.uncertain, 'category'),
@@ -476,19 +582,22 @@ export function PhotoSheetGrid({ photos, onChange, renderPhotoExtra }: PhotoShee
                     })}
 
                     <td className={styles.rowAction}>
-                      <Button
-                        type="text"
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        aria-label={`${photo.seq}번 사진의 ${itemIndex + 1}번째 줄 지우기`}
-                        onClick={() =>
-                          commitItems(
-                            photoIndex,
-                            items.filter((candidate) => candidate.id !== item.id),
-                          )
-                        }
-                      />
+                      {/* 아직 아무것도 안 적힌 줄에는 지울 것이 없다 */}
+                      {!isBlankRow(photo, item) && (
+                        <Button
+                          type="text"
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          aria-label={`${photo.seq}번 사진의 ${itemIndex + 1}번째 줄 지우기`}
+                          onClick={() =>
+                            commitItems(
+                              photoIndex,
+                              items.filter((candidate) => candidate.id !== item.id),
+                            )
+                          }
+                        />
+                      )}
                     </td>
                   </tr>
                 )

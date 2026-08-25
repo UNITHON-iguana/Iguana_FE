@@ -7,7 +7,11 @@ export const queryKeys = {
   photos: (projectId: string) => ['photos', projectId] as const,
   /** 목록 한 페이지. `photos` 접두사를 공유해 한 번에 무효화된다 */
   photoPage: (projectId: string, query: object) => ['photos', projectId, 'page', query] as const,
-  aggregateItems: (projectId: string) => ['aggregateItems', projectId] as const,
+  /** 탭에 붙는 수와 작업일 선택지. 목록과 따로 받는다 */
+  photoSummary: (projectId: string, workDate: string) =>
+    ['photos', projectId, 'summary', workDate] as const,
+  trades: (projectId: string) => ['trades', projectId] as const,
+  aggregation: (projectId: string) => ['aggregation', projectId] as const,
   photo: (photoId: string) => ['photo', photoId] as const,
   workComparison: (projectId: string) => ['comparison', 'work', projectId] as const,
   materialComparison: (projectId: string) => ['comparison', 'material', projectId] as const,
