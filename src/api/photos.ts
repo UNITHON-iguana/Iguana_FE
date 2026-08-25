@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import { confirmBlocker, hasContent } from '@/lib/workItems'
+import { confirmBlocker } from '@/lib/workItems'
 import type { Photo, WorkItem, WorkType } from '@/types'
 
 /**
@@ -206,6 +206,11 @@ export interface WorkDateOption {
   photos: number
 }
 
+interface WorkDateResponse {
+  date: string
+  photoCount: number
+}
+
 export interface PhotoPage {
   items: Photo[]
   /** 필터를 모두 적용한 뒤의 총 개수. 페이지네이션이 쓴다 */
@@ -278,18 +283,18 @@ export async function getPhotoPage(query: PhotoQuery): Promise<PhotoPage> {
  * 세는 전용 API가 없어서 목록을 `size=1`로 두 번 불러 `totalElements`만 꺼낸다.
  * 사진은 한 장도 안 실려 오므로 장수와 무관하게 값이 싸다.
  *
- * **작업일 선택지는 비어 있다.** 어떤 작업일이 있는지 알려주는 API가 없다 —
- * 목록으로는 지금 페이지에 실린 30장의 날짜밖에 못 보고, 그걸 전체인 양 내놓으면
- * 사람이 없는 날을 고르게 된다. 서버가 날짜 목록을 주면 여기만 채우면 된다.
+ * 작업일 선택지는 따로 받는다. **작업일 필터와 무관하게 늘 전체를 묻는다** —
+ * 8월 20일을 보는 중에 선택지가 그 하루로 줄면 다른 날로 옮겨갈 길이 없어진다.
  */
 export async function getPhotoSummary(
   projectId: string,
   workDate: WorkDateFilter,
 ): Promise<PhotoSummary> {
   const date = workDate === 'all' ? undefined : workDate
-  const [review, sheet] = await Promise.all([
+  const [review, sheet, dates] = await Promise.all([
     fetchPage(projectId, { needsReview: true, date, page: 0, size: 1 }),
     fetchPage(projectId, { needsReview: false, date, page: 0, size: 1 }),
+    api.get<WorkDateResponse[]>(`/api/v1/projects/${projectId}/photo-uploads/dates`),
   ])
 
   return {
@@ -298,56 +303,114 @@ export async function getPhotoSummary(
       needsReview: review.totalElements,
       sheet: sheet.totalElements,
     },
-    workDates: [],
+    // 서버는 오름차순으로 준다. 최근 작업일이 위로 오게 뒤집는다
+    workDates: dates
+      .map((row) => ({ workDate: row.date, photos: row.photoCount }))
+      .reverse(),
   }
 }
 
 /**
- * 사진을 지운다.
+ * 사진을 지운다 — `DELETE /api/v1/photo-uploads/{id}`.
  *
- * **서버에 자리가 없다.** 삭제 API가 생길 때까지 부르는 쪽에 사실대로 알린다 —
- * 조용히 성공한 척하면 목록을 다시 받을 때 지운 사진이 되살아나 더 헷갈린다.
+ * 사진에 딸린 항목과 S3의 원본·썸네일까지 함께 사라진다.
+ * 확정 여부와 상관없이 지울 수 있고 되돌릴 수 없다.
  */
-export function removePhoto(): Promise<void> {
-  return Promise.reject(new Error('사진 삭제는 아직 서버에 없습니다'))
+export function removePhoto(photoId: string): Promise<void> {
+  return api.delete<void>(`/api/v1/photo-uploads/${photoId}`)
+}
+
+/** 서버가 받는 수정 요청. 보낼 것만 골라 담는다 */
+interface PhotoPatchRequest {
+  location: string | null
+  workDate: string | null
+  /** 고칠 기존 항목 */
+  items: { itemId: number; workTypeId: number; spec: string | null; rawQuantity: number | null }[]
+  /** 사람이 새로 적은 항목 */
+  newItems: { workTypeId: number; spec: string | null; rawQuantity: number | null }[]
+  /** 사람이 값을 비운 기존 항목 */
+  deleteItemIds: number[]
+  /**
+   * `true`면 서버가 모든 항목이 채워졌는지 보고, 통과해야 저장되며 사진이 확정된다.
+   * `false`면 검증 없이 보낸 것만 저장하고 사진은 검수 대기로 남는다.
+   */
+  confirm: boolean
 }
 
 /**
- * 사진 한 장 확정 — `PATCH /api/v1/photo-uploads/{id}`.
+ * 사진 한 장을 요청 모양으로 옮긴다.
  *
- * 그 사진에 딸린 **항목 전부**를 함께 보내고, 성공하면 사진이 통째로 확정된다
- * (`status: CONFIRMED`, `needsReview: false`). 공종이 비어 있는 항목이 하나라도 있으면
- * 400이라 여기서도 같은 조건으로 막는다(`confirmBlocker`).
+ * 항목이 세 갈래로 갈린다 — 화면의 칸 하나가 서버 항목 하나이고, 그 칸에 서버 id가
+ * 붙어 있는지와 값이 남아 있는지가 갈림길이다.
  *
- * **사람이 값을 고친 사진만 이 호출을 탄다.** AI가 다 맞춘 사진은 승인이 필요 없어
- * 아무도 부르지 않는다 — 그래서 하루 수백 장이 올라와도 호출은 사람이 고친 만큼이고,
- * 그때그때 한 장씩 흩어져 나간다.
+ * | 서버 id | 값 | 어디로 |
+ * | --- | --- | --- |
+ * | 있다 | 있다 | `items` — 고친다 |
+ * | 있다 | 없다 | `deleteItemIds` — 사람이 비웠으니 지운다 |
+ * | 없다 | 있다 | `newItems` — 사람이 새로 적었다 |
  *
- * 화면은 공종을 **이름**으로 다룬다(사진대지 `구 분` 칸이 이름을 고른다). 서버는 id를
- * 받으므로 등록된 공종 목록으로 이름을 id로 옮긴다.
+ * **공종을 아직 안 고른 항목은 보내지 않는다.** 서버가 공종 id를 필수로 받아 담을
+ * 자리가 없다. 그런 항목이 남아 있으면 `confirm`이 서지 않으므로 확정도 되지 않는다.
  *
- * **`quantity`는 보내지 않는다.** 규격을 둘레 연장으로 환산한 집계 쪽 값이고,
- * 그 환산 규칙은 서버에만 있다 — 프론트에 더하기·곱하기 규칙을 두지 않기로 했다.
- * 사람이 고치는 것은 개수(`rawQuantity`)뿐이다.
+ * **`quantity`는 보내지 않는다.** 규격을 둘레 연장으로 환산한 집계 쪽 값이고 그 규칙은
+ * 서버에만 있다 — 규격과 개수를 주면 서버가 다시 계산한다. 사람이 고치는 것은 개수뿐이다.
  */
-export async function confirmPhoto(photo: Photo, workTypes: WorkType[]): Promise<Photo> {
-  const blocker = confirmBlocker(photo)
-  if (blocker) throw new Error(blocker)
-
+function toPatchRequest(photo: Photo, workTypes: WorkType[], confirm: boolean): PhotoPatchRequest {
   const idByName = new Map(workTypes.map((workType) => [workType.name, workType.id]))
+  const request: PhotoPatchRequest = {
+    location: photo.location,
+    workDate: photo.workDate,
+    items: [],
+    newItems: [],
+    deleteItemIds: [],
+    confirm,
+  }
 
-  const items = photo.workItems.filter(hasContent).flatMap((item) =>
-    item.entries
-      // 양식을 채우려고 깔아둔 빈 칸은 보내지 않는다
-      .filter((entry) => entry.itemId != null && (entry.spec || entry.quantity != null))
-      .map((entry) => ({
+  for (const row of photo.workItems) {
+    const workTypeId = row.category ? (idByName.get(row.category) ?? null) : null
+
+    for (const entry of row.entries) {
+      const filled = Boolean(entry.spec) || entry.quantity != null
+
+      if (entry.itemId == null) {
+        if (filled && workTypeId != null) {
+          request.newItems.push({ workTypeId, spec: entry.spec, rawQuantity: entry.quantity })
+        }
+        continue
+      }
+      if (!filled) {
+        request.deleteItemIds.push(entry.itemId)
+        continue
+      }
+      if (workTypeId == null) continue
+
+      request.items.push({
         itemId: entry.itemId,
-        workTypeId: item.category ? (idByName.get(item.category) ?? null) : null,
+        workTypeId,
         spec: entry.spec,
         rawQuantity: entry.quantity,
-      })),
-  )
+      })
+    }
+  }
 
-  const res = await api.patch<PhotoUploadResponse>(`/api/v1/photo-uploads/${photo.id}`, { items })
+  return request
+}
+
+/**
+ * 사진 한 장을 저장한다 — `PATCH /api/v1/photo-uploads/{id}`.
+ *
+ * **손볼 것이 남았어도 저장한다.** 확인할 칸이 다 채워졌으면 `confirm: true`로 보내
+ * 사진이 통째로 확정되고, 남아 있으면 `confirm: false`로 보내 고친 것만 서버에 얹고
+ * 검수 대기로 둔다. 무엇이 확정을 막는지는 `confirmBlocker` 한 곳이 정한다 —
+ * 그 판정이 서버가 400을 내는 조건과 같아야 저장이 되돌아오지 않는다.
+ *
+ * 그래서 고치는 중인 값도 브라우저에만 머물지 않는다. 창을 닫아도 남는다.
+ *
+ * 화면은 공종을 **이름**으로 다룬다(사진대지 `구 분` 칸이 이름을 고른다).
+ * 서버는 id를 받으므로 등록된 공종 목록으로 이름을 id로 옮긴다.
+ */
+export async function savePhoto(photo: Photo, workTypes: WorkType[]): Promise<Photo> {
+  const body = toPatchRequest(photo, workTypes, confirmBlocker(photo) === null)
+  const res = await api.patch<PhotoUploadResponse>(`/api/v1/photo-uploads/${photo.id}`, body)
   return toPhoto(res, photo.projectId)
 }

@@ -23,7 +23,7 @@ import { useParams } from 'react-router'
 
 import {
   addPhotos,
-  confirmPhoto,
+  savePhoto,
   getPhotoPage,
   getPhotoSummary,
   removePhoto,
@@ -35,7 +35,7 @@ import { queryKeys } from '@/api/queryKeys'
 import { getWorkTypes } from '@/api/workTypes'
 import { PhotoSheetGrid } from '@/features/photo-sheet/PhotoSheetGrid'
 import { ACCEPTED_IMAGE_EXTENSIONS, PHOTOS_PER_PAGE } from '@/lib/constants'
-import { confirmBlocker, needsReview } from '@/lib/workItems'
+import { confirmBlocker } from '@/lib/workItems'
 import type { Photo, WorkType } from '@/types'
 
 const EMPTY_COUNTS: PhotoCounts = { photos: 0, needsReview: 0, sheet: 0 }
@@ -65,8 +65,8 @@ function ReviewMark({ photo }: { photo: Photo }) {
 
 function workDateOptions(options: WorkDateOption[]) {
   return options.map((option) => ({
-    value: option.workDate ?? 'undated',
-    label: `${option.workDate ?? '작업일 없음'} (${option.photos}장)`,
+    value: option.workDate,
+    label: `${option.workDate} (${option.photos}장)`,
   }))
 }
 
@@ -112,6 +112,8 @@ export function SheetPage() {
 
   /** 고쳤지만 아직 안 나간 사진. 화면을 떠날 때 흘려보내지 않으려고 붙든다 */
   const waiting = useRef(new Map<string, Photo>())
+  /** 그중 몇 장이 떠 있는지 — 화면에 보여주고 창 닫기를 붙잡는 데 쓴다 */
+  const [unsent, setUnsent] = useState(0)
   /*
    * 확정 호출은 공종 이름을 id로 옮겨야 해서 목록이 필요하다.
    * 화면을 떠나며 보내는 마지막 한 장은 렌더 밖에서 나가므로 ref로 최신값을 쥐고 있는다.
@@ -193,14 +195,14 @@ export function SheetPage() {
     onError: () => message.error('업로드에 실패했습니다. 다시 시도해주세요.'),
   })
 
-  const { mutate: remove } = useMutation<void, Error, string>({
+  const { mutate: remove } = useMutation({
     mutationFn: removePhoto,
     onSuccess: invalidate,
-    onError: (error) => message.error(error.message),
+    onError: () => message.error('사진을 지우지 못했습니다. 잠시 뒤 다시 시도해주세요.'),
   })
 
-  const { mutateAsync: confirm } = useMutation({
-    mutationFn: (photo: Photo) => confirmPhoto(photo, latestWorkTypes.current),
+  const { mutateAsync: save } = useMutation({
+    mutationFn: (photo: Photo) => savePhoto(photo, latestWorkTypes.current),
     onError: () => message.error('저장하지 못했습니다. 잠시 뒤 다시 시도해주세요.'),
   })
 
@@ -212,7 +214,11 @@ export function SheetPage() {
        * 사진에서 손을 떼지 않은 채 화면을 떠나는 길이 있다 — 메뉴를 누르거나 뒤로 가기.
        * 그때 마지막 편집이 사라지지 않게 여기서 보낸다.
        */
-      pendingPhotos.forEach((photo) => void confirmPhoto(photo, workTypesAtUnmount.current))
+      pendingPhotos.forEach((photo) => {
+        savePhoto(photo, workTypesAtUnmount.current).catch(() => {
+          // 떠나는 길이라 알릴 화면이 없다. 조용히 흘려보내되 터뜨리지는 않는다
+        })
+      })
       pendingPhotos.clear()
     }
   }, [])
@@ -220,12 +226,9 @@ export function SheetPage() {
   /** 편집분을 덮어쓴 현재 값 */
   const current = items.map((photo) => drafts[photo.id] ?? photo)
 
-  /** 확인할 칸이 남아 아직 서버에 못 올린 사진. 이만큼이 브라우저에만 있다 */
-  const unsent = Object.values(drafts).filter(needsReview).length
-
   /*
-   * 못 올린 편집분은 브라우저에만 있다. 창을 닫기 전에 한 번 붙잡는다.
-   * 값만 저장하는 API가 생기면 이 경고는 필요 없어진다.
+   * 사진에서 손을 떼기 전에 창을 닫으면 그 한 장은 아직 안 나갔다.
+   * 저장 자체는 확인할 칸이 남아도 되므로, 붙잡는 것은 이 짧은 틈뿐이다.
    */
   useEffect(() => {
     if (unsent === 0) return
@@ -244,9 +247,8 @@ export function SheetPage() {
   function edit(photo: Photo) {
     setPicked(view)
     setDrafts((prev) => ({ ...prev, [photo.id]: photo }))
-    // 확정 API는 사진 하나를 통째로 받고 공종이 빈 항목이 있으면 400이라, 아직 못 보낸다
-    if (needsReview(photo)) waiting.current.delete(photo.id)
-    else waiting.current.set(photo.id, photo)
+    waiting.current.set(photo.id, photo)
+    setUnsent(waiting.current.size)
   }
 
   /**
@@ -254,16 +256,32 @@ export function SheetPage() {
    *
    * 엑셀이 칸을 벗어날 때 값을 확정하는 것과 같다. 같은 사진 안에서 칸을 오가는 동안은
    * 아무것도 보내지 않으므로, 사진 한 장에 호출은 한 번이다.
-   * 확인할 칸이 남은 사진은 `waiting`에 들어가지 않아 여기서도 걸러진다.
+   *
+   * **확인할 칸이 남았어도 보낸다.** 남아 있으면 서버가 확정하지 않고 고친 것만 얹는다
+   * (`savePhoto`). 다 채워졌으면 그 자리에서 확정된다.
    */
   async function leave(photo: Photo) {
     const edited = waiting.current.get(photo.id)
     if (!edited) return
 
     waiting.current.delete(photo.id)
+    setUnsent(waiting.current.size)
     setSaving(true)
-    await confirm(edited)
-    setSaving(false)
+    try {
+      /*
+       * 서버가 돌려준 사진으로 갈아 끼운다.
+       * 값을 비워 지운 항목이 화면에 남아 있으면 다음 저장에 그 id가 또 실려 나가고,
+       * 규격을 고쳤을 때 서버가 다시 계산한 수량도 이때 들어온다.
+       */
+      const saved = await save(edited)
+      setDrafts((prev) => ({ ...prev, [photo.id]: saved }))
+    } catch {
+      // 실패는 mutation이 알린다. 고친 값은 붙들어 두어 다음 기회에 다시 나가게 한다
+      waiting.current.set(photo.id, edited)
+      setUnsent(waiting.current.size)
+    } finally {
+      setSaving(false)
+    }
     /*
      * 화면에 걸린 목록은 다시 받지 않는다(`refetchType: 'none'`) — 검수 탭은 확인할
      * 칸이 남은 사진만 주므로, 방금 끝낸 사진이 목록에서 빠지면 화면이 밀린다.
@@ -415,10 +433,10 @@ export function SheetPage() {
         </Flex>
 
         <Flex align="center" gap={8}>
-          {/* 못 올린 편집분은 브라우저에만 있다. 몇 장이 떠 있는지 늘 보이게 둔다 */}
+          {/* 손을 떼기 전 한 장은 아직 안 나갔다. 떠 있는 동안만 밝힌다 */}
           {unsent > 0 ? (
-            <Tooltip title="확인이 필요한 칸을 다 채우면 그때 저장됩니다">
-              <Typography.Text type="warning">확인 필요 {unsent}장 · 저장 전</Typography.Text>
+            <Tooltip title="사진에서 손을 떼면 저장됩니다">
+              <Typography.Text type="warning">고치는 중 {unsent}장</Typography.Text>
             </Tooltip>
           ) : (
             <Typography.Text type="secondary">{saving ? '저장 중' : '저장됨'}</Typography.Text>
