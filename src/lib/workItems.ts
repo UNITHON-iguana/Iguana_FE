@@ -58,6 +58,14 @@ export function confirmBlocker(photo: Photo): string | null {
   }
   const uncertain = photoUncertainCount(photo)
   if (uncertain > 0) return `확인이 필요한 칸 ${uncertain}개를 먼저 채워주세요`
+  /*
+   * 공종이 빈 항목이 하나라도 있으면 서버가 400을 낸다.
+   * AI가 못 찾은 줄은 위 `uncertain`이 이미 잡지만, 사람이 멀쩡한 공종을 지운 줄에는
+   * 표시가 안 붙는다. 그 줄을 여기서 잡지 않으면 저장이 서버에서 되돌아온다.
+   */
+  if (photo.workItems.filter(hasContent).some((item) => !item.category)) {
+    return '공종을 고르지 않은 줄이 있습니다'
+  }
   // 작업일이 없으면 집계가 어느 열에도 못 넣는다. 확정 전에 받아둔다
   if (!photo.workDate) return '작업일을 채워주세요'
   return null
@@ -66,8 +74,9 @@ export function confirmBlocker(photo: Photo): string | null {
 /**
  * 사람이 봐야 하는 사진 — 지금 이대로는 반영할 수 없는 사진.
  *
- * 서버도 같은 뜻의 `needsReview`를 사진마다 들고 온다.
- * 붙일 때 이 함수는 그 값을 읽는 자리로 바뀐다 — 판정 자체가 서버 몫이기 때문이다.
+ * 목록의 탭을 가르는 것은 서버의 `needsReview`다. 이 함수가 남아 있는 이유는
+ * **고치는 중인 값**을 재는 자리가 따로 필요해서다 — 사람이 방금 채운 칸은 아직
+ * 서버에 없고, 그래도 화면은 이 사진을 아직 못 보낸다고 표시해야 한다.
  */
 export function needsReview(photo: Photo): boolean {
   return confirmBlocker(photo) !== null

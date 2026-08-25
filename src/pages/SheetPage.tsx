@@ -4,7 +4,6 @@ import {
   CheckOutlined,
   DownloadOutlined,
   PictureOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -14,7 +13,6 @@ import {
   Flex,
   Pagination,
   Popconfirm,
-  Progress,
   Select,
   Tabs,
   Tooltip,
@@ -29,7 +27,6 @@ import {
   getPhotoPage,
   getPhotoSummary,
   removePhoto,
-  startAnalysis,
 } from '@/api/photos'
 import type { PhotoCounts, PhotoScope, WorkDateFilter, WorkDateOption } from '@/api/photos'
 import { downloadSheetExcel } from '@/api/exports'
@@ -39,15 +36,9 @@ import { getWorkTypes } from '@/api/workTypes'
 import { PhotoSheetGrid } from '@/features/photo-sheet/PhotoSheetGrid'
 import { ACCEPTED_IMAGE_EXTENSIONS, PHOTOS_PER_PAGE } from '@/lib/constants'
 import { confirmBlocker, needsReview } from '@/lib/workItems'
-import type { Photo } from '@/types'
+import type { Photo, WorkType } from '@/types'
 
-const EMPTY_COUNTS: PhotoCounts = {
-  photos: 0,
-  inProgress: 0,
-  failed: 0,
-  needsReview: 0,
-  sheet: 0,
-}
+const EMPTY_COUNTS: PhotoCounts = { photos: 0, needsReview: 0, sheet: 0 }
 
 /**
  * 사진 한 장의 상태 표시.
@@ -119,22 +110,31 @@ export function SheetPage() {
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
 
-  /** 직전 처리 중 장수. 분석이 방금 끝났는지 알아내는 데 쓴다 */
-  const wasInProgress = useRef(0)
   /** 고쳤지만 아직 안 나간 사진. 화면을 떠날 때 흘려보내지 않으려고 붙든다 */
   const waiting = useRef(new Map<string, Photo>())
+  /*
+   * 확정 호출은 공종 이름을 id로 옮겨야 해서 목록이 필요하다.
+   * 화면을 떠나며 보내는 마지막 한 장은 렌더 밖에서 나가므로 ref로 최신값을 쥐고 있는다.
+   */
+  const latestWorkTypes = useRef<WorkType[]>([])
 
   const { data: project } = useQuery({
     queryKey: queryKeys.project(projectId),
     queryFn: () => getProject(projectId),
   })
 
-  /* `구 분` 칸이 고르는 목록. 이름만 있으면 되므로 이름만 꺼낸다 */
+  /*
+   * `구 분` 칸이 고르는 목록.
+   * 화면은 이름만 쓰지만 확정할 때 서버에 id를 보내야 해서 목록을 통째로 쥔다.
+   */
   const { data: workTypes = [] } = useQuery({
     queryKey: queryKeys.workTypes(projectId),
     queryFn: () => getWorkTypes(projectId),
-    select: (list) => list.map((workType) => workType.name).filter(Boolean),
   })
+  const workTypeNames = workTypes.map((workType) => workType.name).filter(Boolean)
+  useEffect(() => {
+    latestWorkTypes.current = workTypes
+  }, [workTypes])
 
   /*
    * 탭에 붙는 수와 작업일 선택지는 목록과 따로 받는다.
@@ -144,12 +144,6 @@ export function SheetPage() {
   const { data: summary } = useQuery({
     queryKey: queryKeys.photoSummary(projectId, workDate),
     queryFn: () => getPhotoSummary(projectId, workDate),
-    /**
-     * 처리 중인 사진이 남아 있는 동안만 다시 물어본다.
-     * 백엔드가 충분히 빨라 한 번에 결과가 오면 이 줄만 지우면 된다.
-     */
-    refetchInterval: (queryState) =>
-      queryState.state.data && queryState.state.data.counts.inProgress > 0 ? 1000 : false,
   })
 
   const counts = summary?.counts ?? EMPTY_COUNTS
@@ -167,8 +161,6 @@ export function SheetPage() {
     queryFn: () => getPhotoPage(query),
     // 페이지를 넘길 때 표가 비었다가 다시 차는 깜빡임을 없앤다
     placeholderData: keepPreviousData,
-    // 분석이 도는 동안에는 결과가 들어오는 대로 목록에도 얹는다
-    refetchInterval: counts.inProgress > 0 ? 1000 : false,
   })
 
   const items = data?.items ?? []
@@ -176,60 +168,54 @@ export function SheetPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.photos(projectId) })
 
-  const { mutate: add } = useMutation({
+  /**
+   * 사진을 올린다 — **분석까지 이 한 번에 끝난다.**
+   *
+   * 서버가 S3 업로드·AI 분석·저장을 다 마치고 결과를 들고 돌아오므로 따로 분석을 걸
+   * 자리가 없다. 그래서 결과도 여기서 바로 알린다 — 몇 장이 들어왔고 그중 몇 장을
+   * 사람이 봐야 하는지가 요점이다.
+   */
+  const { mutate: add, isPending: uploading } = useMutation({
     mutationFn: (files: File[]) => addPhotos(projectId, files),
-    onSuccess: invalidate,
+    onSuccess: ({ createdCount, needsReviewCount }) => {
+      invalidate()
+      if (needsReviewCount > 0) {
+        /*
+         * 손볼 사진이 있으면 검수 탭으로 옮긴다.
+         * 확인할 칸이 없는 사진은 그대로 사진대지 탭으로 가 실적이 되므로 볼 이유가 없다.
+         */
+        refilter(() => setPicked('review'))
+        message.info(`사진 ${createdCount}장 중 확인이 필요한 사진 ${needsReviewCount}장입니다`)
+      } else {
+        message.success(`사진 ${createdCount}장 모두 확인할 칸 없이 집계에 들어갔습니다`)
+      }
+    },
     onError: () => message.error('업로드에 실패했습니다. 다시 시도해주세요.'),
   })
 
-  const { mutate: remove } = useMutation({
+  const { mutate: remove } = useMutation<void, Error, string>({
     mutationFn: removePhoto,
     onSuccess: invalidate,
-    onError: () => message.error('삭제에 실패했습니다. 다시 시도해주세요.'),
-  })
-
-  const { mutate: analyze, isPending: analyzing } = useMutation({
-    mutationFn: () => startAnalysis(projectId),
-    /*
-     * 분석을 걸면 곧바로 검수 탭으로 옮긴다.
-     * 확인할 칸이 없는 사진은 그대로 사진대지 탭으로 가 실적이 되므로 사람이 볼 이유가
-     * 없다. 결과가 들어오는 대로 손봐야 할 사진만 여기에 쌓인다.
-     */
-    onSuccess: () => {
-      refilter(() => setPicked('review'))
-      invalidate()
-    },
-    onError: () => message.error('분석 실행에 실패했습니다. 다시 시도해주세요.'),
+    onError: (error) => message.error(error.message),
   })
 
   const { mutateAsync: confirm } = useMutation({
-    mutationFn: confirmPhoto,
+    mutationFn: (photo: Photo) => confirmPhoto(photo, latestWorkTypes.current),
     onError: () => message.error('저장하지 못했습니다. 잠시 뒤 다시 시도해주세요.'),
   })
 
   useEffect(() => {
     const pendingPhotos = waiting.current
+    const workTypesAtUnmount = latestWorkTypes
     return () => {
       /*
        * 사진에서 손을 떼지 않은 채 화면을 떠나는 길이 있다 — 메뉴를 누르거나 뒤로 가기.
        * 그때 마지막 편집이 사라지지 않게 여기서 보낸다.
        */
-      pendingPhotos.forEach((photo) => void confirmPhoto(photo))
+      pendingPhotos.forEach((photo) => void confirmPhoto(photo, workTypesAtUnmount.current))
       pendingPhotos.clear()
     }
   }, [])
-
-  /** 분석이 방금 끝났으면 결과를 한 줄로 알린다. 남은 일이 있는지가 요점이다 */
-  useEffect(() => {
-    if (wasInProgress.current > 0 && counts.inProgress === 0) {
-      if (counts.needsReview > 0) {
-        message.info(`확인이 필요한 사진 ${counts.needsReview}장입니다`)
-      } else {
-        message.success('확인할 칸이 없어 모두 그대로 집계에 들어갔습니다')
-      }
-    }
-    wasInProgress.current = counts.inProgress
-  }, [counts.inProgress, counts.needsReview, message])
 
   /** 편집분을 덮어쓴 현재 값 */
   const current = items.map((photo) => drafts[photo.id] ?? photo)
@@ -366,10 +352,7 @@ export function SheetPage() {
       return '이 작업일에는 사진이 없습니다. 위에서 작업일을 바꿔보세요.'
     }
     if (counts.photos === 0) {
-      return '사진 추가로 현장 사진을 올리고 AI 분석을 실행하면 여기에 사진대지가 만들어집니다.'
-    }
-    if (counts.inProgress > 0 && counts.photos === counts.inProgress) {
-      return '올린 사진을 분석하고 있습니다. 끝나면 여기에 사진대지가 만들어집니다.'
+      return '사진 추가로 현장 사진을 올리면 AI가 읽어 여기에 사진대지를 만듭니다.'
     }
     if (view === 'review') {
       return '확인이 필요한 사진이 없습니다. 사진대지 탭에 다 들어가 있습니다.'
@@ -387,7 +370,7 @@ export function SheetPage() {
           {pager}
           <PhotoSheetGrid
             photos={current}
-            workTypes={workTypes}
+            workTypes={workTypeNames}
             onChange={edit}
             onLeave={leave}
             renderPhotoExtra={(photo) => (
@@ -426,7 +409,7 @@ export function SheetPage() {
           </Typography.Title>
           {counts.photos > 0 && (
             <Typography.Text type="secondary">
-              사진 {counts.photos}장{counts.failed > 0 && ` · 분석 실패 ${counts.failed}장`}
+              사진 {counts.photos}장
             </Typography.Text>
           )}
         </Flex>
@@ -440,6 +423,10 @@ export function SheetPage() {
           ) : (
             <Typography.Text type="secondary">{saving ? '저장 중' : '저장됨'}</Typography.Text>
           )}
+          {/*
+            사진 추가가 곧 분석이다 — 서버가 올리기·AI·저장을 한 호출에서 끝낸다.
+            그래서 결과를 만드는 동작이 이 버튼 하나뿐이라 주색을 여기에 붙인다.
+          */}
           <Upload
             multiple
             accept={ACCEPTED_IMAGE_EXTENSIONS}
@@ -450,30 +437,12 @@ export function SheetPage() {
               return false
             }}
           >
-            <Button icon={<PictureOutlined />}>사진 추가</Button>
+            <Button type="primary" icon={<PictureOutlined />} loading={uploading}>
+              사진 추가
+            </Button>
           </Upload>
-          <Button
-            type="primary"
-            icon={<ThunderboltOutlined />}
-            disabled={counts.photos === 0 || counts.inProgress > 0}
-            loading={analyzing}
-            onClick={() => analyze()}
-          >
-            AI 분석 실행
-          </Button>
         </Flex>
       </Flex>
-
-      {counts.inProgress > 0 && (
-        <Flex align="center" gap={16}>
-          <Progress
-            percent={Math.round(((counts.photos - counts.inProgress) / counts.photos) * 100)}
-            status="active"
-            style={{ flex: 1 }}
-          />
-          <Typography.Text type="secondary">처리 중 {counts.inProgress}장</Typography.Text>
-        </Flex>
-      )}
 
       {counts.photos === 0 ? (
         !isLoading && <Empty description={emptyDescription()} />

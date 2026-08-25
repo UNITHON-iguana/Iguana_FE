@@ -1,78 +1,95 @@
-import { planMaterialItems, planWorkItems } from '@/mocks/db'
-import { delay } from '@/mocks/delay'
-import type { PlanMaterialItem, PlanWorkItem } from '@/types'
+import { api } from '@/lib/api'
+import type { PlanWorkItem } from '@/types'
 
 /**
- * 계획 데이터.
+ * 계획 공정 — 위치·공종·작업내용마다 목표 물량을 적어두는 표.
  *
- * 엑셀 업로드로 받지 않고 화면에서 직접 입력한다.
- * 현장·발주처마다 계획 양식이 제각각이라, 파일을 읽어 맞추는 것보다
- * 필요한 줄을 직접 넣는 편이 빠르다.
+ * 계획 대비 현황이 이 표를 기준으로 삼는다. 엑셀 업로드는 받지 않는다 —
+ * 계획 양식이 현장·발주처마다 제각각이라 필요한 줄을 표에서 직접 넣는 편이 빠르다.
+ *
+ * **자재 계획은 두지 않는다.** 서버가 자재 실적을 따로 재지 않아 비교가 성립하지 않는다.
  */
 
-export function getPlanWorkItems(projectId: string): Promise<PlanWorkItem[]> {
-  return delay(planWorkItems.filter((item) => item.projectId === projectId).map((i) => ({ ...i })))
+interface PlanProcessResponse {
+  id: number
+  workTypeId: number
+  workTypeName: string
+  location: string
+  workDetail: string
+  plannedQuantity: number | null
+  unit: string | null
 }
 
-export function getPlanMaterialItems(projectId: string): Promise<PlanMaterialItem[]> {
-  return delay(
-    planMaterialItems.filter((item) => item.projectId === projectId).map((i) => ({ ...i })),
+/** 서버가 한 줄을 만들거나 고칠 때 받는 모양. 부분 수정은 없고 전체를 교체한다 */
+interface PlanProcessRequest {
+  workTypeId: number
+  location: string
+  workDetail: string
+  plannedQuantity: number | null
+  unit: string | null
+}
+
+function path(projectId: string): string {
+  return `/api/v1/projects/${projectId}/plans/process`
+}
+
+function toPlanWorkItem(res: PlanProcessResponse): PlanWorkItem {
+  return {
+    id: String(res.id),
+    location: res.location,
+    workTypeId: res.workTypeId,
+    workType: res.workTypeName,
+    description: res.workDetail,
+    quantity: res.plannedQuantity,
+    unit: res.unit,
+  }
+}
+
+/**
+ * 저장할 모양으로 옮긴다.
+ *
+ * 공종은 서버가 id로만 받는다 — 아직 안 고른 줄은 보낼 수 없어 부르는 쪽이 먼저 막는다.
+ * 빈 글자 칸은 그대로 보낸다. 사람이 지운 값을 임의로 되살리지 않는다.
+ */
+function toRequest(item: PlanWorkItem): PlanProcessRequest {
+  if (item.workTypeId == null) throw new Error('공종을 먼저 골라주세요')
+  return {
+    workTypeId: item.workTypeId,
+    location: item.location,
+    workDetail: item.description,
+    plannedQuantity: item.quantity,
+    unit: item.unit,
+  }
+}
+
+export async function getPlanWorkItems(projectId: string): Promise<PlanWorkItem[]> {
+  const list = await api.get<PlanProcessResponse[]>(path(projectId))
+  return list.map(toPlanWorkItem)
+}
+
+/**
+ * 줄 하나를 등록한다.
+ *
+ * **공종이 정해진 뒤에야 부를 수 있다.** 서버가 `workTypeId`를 필수로 받아서, 빈 줄을
+ * 먼저 만들어두고 채워 넣는 순서가 성립하지 않는다. 그래서 `줄 추가`는 화면에만 줄을
+ * 깔고, 사람이 공종을 고르는 순간 이 호출이 나간다(`PlanPage`의 `commit`).
+ */
+export async function addPlanWorkItem(
+  projectId: string,
+  item: PlanWorkItem,
+): Promise<PlanWorkItem> {
+  return toPlanWorkItem(await api.post<PlanProcessResponse>(path(projectId), toRequest(item)))
+}
+
+export async function savePlanWorkItem(
+  projectId: string,
+  item: PlanWorkItem,
+): Promise<PlanWorkItem> {
+  return toPlanWorkItem(
+    await api.patch<PlanProcessResponse>(`${path(projectId)}/${item.id}`, toRequest(item)),
   )
 }
 
-/** 빈 줄 하나를 만든다. 값은 사람이 채운다 */
-export function addPlanWorkItem(projectId: string): Promise<PlanWorkItem> {
-  const item: PlanWorkItem = {
-    id: `pw${Date.now()}`,
-    projectId,
-    location: '',
-    workType: '',
-    description: '',
-    quantity: null,
-    unit: null,
-  }
-  planWorkItems.push(item)
-  return delay({ ...item }, 200)
-}
-
-export function addPlanMaterialItem(projectId: string): Promise<PlanMaterialItem> {
-  const item: PlanMaterialItem = {
-    id: `pm${Date.now()}`,
-    projectId,
-    location: '',
-    workType: '',
-    material: '',
-    quantity: null,
-    unit: null,
-  }
-  planMaterialItems.push(item)
-  return delay({ ...item }, 200)
-}
-
-export function savePlanWorkItem(item: PlanWorkItem): Promise<PlanWorkItem> {
-  const found = planWorkItems.find((candidate) => candidate.id === item.id)
-  if (!found) throw new Error('계획 공정을 찾을 수 없습니다')
-
-  Object.assign(found, item)
-  return delay({ ...found }, 300)
-}
-
-export function savePlanMaterialItem(item: PlanMaterialItem): Promise<PlanMaterialItem> {
-  const found = planMaterialItems.find((candidate) => candidate.id === item.id)
-  if (!found) throw new Error('계획 자재를 찾을 수 없습니다')
-
-  Object.assign(found, item)
-  return delay({ ...found }, 300)
-}
-
-export function removePlanWorkItem(id: string): Promise<void> {
-  const index = planWorkItems.findIndex((item) => item.id === id)
-  if (index >= 0) planWorkItems.splice(index, 1)
-  return delay(undefined, 200)
-}
-
-export function removePlanMaterialItem(id: string): Promise<void> {
-  const index = planMaterialItems.findIndex((item) => item.id === id)
-  if (index >= 0) planMaterialItems.splice(index, 1)
-  return delay(undefined, 200)
+export function removePlanWorkItem(projectId: string, id: string): Promise<void> {
+  return api.delete<void>(`${path(projectId)}/${id}`)
 }

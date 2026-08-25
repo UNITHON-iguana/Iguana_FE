@@ -2,11 +2,10 @@ import { useState } from 'react'
 
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, DatePicker, Empty, Flex, Form, Input, Modal, Typography } from 'antd'
-import type { Dayjs } from 'dayjs'
+import { App, Button, Empty, Flex, Form, Input, Modal, Popconfirm, Typography } from 'antd'
 import { useNavigate } from 'react-router'
 
-import { createProject, getProjects } from '@/api/projects'
+import { createProject, getProjects, removeProject } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
 import { createWorkTypes } from '@/api/workTypes'
 import { DataTable } from '@/components/DataTable'
@@ -14,18 +13,15 @@ import type { Project } from '@/types'
 
 interface ProjectFormValues {
   name: string
-  siteName: string
-  period?: [Dayjs, Dayjs]
+  address?: string
   /** 사진대지의 `구 분`으로 쓸 공종. 나중에 공종 화면에서 더할 수 있다 */
   workTypes?: string[]
 }
 
-/** 폼 값을 API가 받는 모양으로 옮긴 것 — 기간 한 칸이 시작·종료 두 값으로 갈린다 */
+/** 폼 값을 API가 받는 모양으로 옮긴 것 — 공종만 프로젝트와 다른 호출로 나간다 */
 interface CreateInput {
   name: string
-  siteName: string
-  startDate: string | null
-  endDate: string | null
+  address: string
   workTypes: string[]
 }
 
@@ -82,21 +78,43 @@ export function ProjectsPage() {
     onError: () => message.error('프로젝트 저장에 실패했습니다. 잠시 후 다시 시도해주세요.'),
   })
 
+  const { mutate: remove } = useMutation({
+    mutationFn: removeProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects })
+      message.success('프로젝트를 지웠습니다')
+    },
+    onError: () => message.error('프로젝트를 지우지 못했습니다. 잠시 후 다시 시도해주세요.'),
+  })
+
   const columns = [
     { title: '공사명', dataIndex: 'name' },
-    { title: '현장명', dataIndex: 'siteName' },
-    {
-      title: '공사 기간',
-      render: (_: unknown, row: Project) =>
-        row.startDate && row.endDate ? `${row.startDate} ~ ${row.endDate}` : '-',
-    },
+    { title: '주소', dataIndex: 'address' },
     {
       title: '',
-      width: 100,
+      width: 140,
       render: (_: unknown, row: Project) => (
-        <Button type="link" onClick={() => navigate(`/projects/${row.id}/sheet`)}>
-          열기
-        </Button>
+        <Flex align="center" justify="end" gap={4}>
+          <Button type="link" onClick={() => navigate(`/projects/${row.id}/sheet`)}>
+            열기
+          </Button>
+          {/*
+            지우면 그 현장의 사진·검수 결과·공종·계획이 통째로 사라지고 되돌릴 수 없다.
+            무엇이 사라지는지를 묻는 자리에서 밝힌다 — 이름만 대면 무게가 안 보인다.
+          */}
+          <Popconfirm
+            title={`${row.name} 프로젝트를 지웁니다`}
+            description="올린 사진과 검수 결과, 공종, 계획이 모두 사라집니다. 되돌릴 수 없습니다."
+            okText="삭제"
+            cancelText="취소"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => remove(row.id)}
+          >
+            <Button type="text" size="small" danger>
+              삭제
+            </Button>
+          </Popconfirm>
+        </Flex>
       ),
     },
   ]
@@ -136,9 +154,7 @@ export function ProjectsPage() {
           onFinish={(values) =>
             create({
               name: values.name,
-              siteName: values.siteName,
-              startDate: values.period?.[0].format('YYYY-MM-DD') ?? null,
-              endDate: values.period?.[1].format('YYYY-MM-DD') ?? null,
+              address: values.address?.trim() ?? '',
               workTypes: values.workTypes ?? [],
             })
           }
@@ -150,15 +166,8 @@ export function ProjectsPage() {
           >
             <Input placeholder="○○ 신축공사" />
           </Form.Item>
-          <Form.Item
-            name="siteName"
-            label="현장명"
-            rules={[{ required: true, message: '현장명을 입력해주세요' }]}
-          >
-            <Input placeholder="가산동 현장" />
-          </Form.Item>
-          <Form.Item name="period" label="공사 기간">
-            <DatePicker.RangePicker style={{ width: '100%' }} />
+          <Form.Item name="address" label="주소">
+            <Input placeholder="서울특별시 금천구 가산동 1-1" />
           </Form.Item>
 
           {/*

@@ -1,53 +1,55 @@
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Empty, Flex, Input, InputNumber, Popconfirm } from 'antd'
+import { Button, Empty, Flex, Input, InputNumber, Popconfirm, Select } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 
 import { DataTable } from '@/components/DataTable'
-import type { PlanItemBase } from '@/types'
+import type { PlanWorkItem, WorkType } from '@/types'
 
-export interface PlanItemTableProps<T extends PlanItemBase> {
-  items: T[]
+export interface PlanItemTableProps {
+  items: PlanWorkItem[]
+  /** `구 분` 칸이 고르는 목록. 서버가 공종을 id로 받아 이름만으로는 저장할 수 없다 */
+  workTypes: WorkType[]
   loading?: boolean
-  /** 공정은 `description`, 자재는 `material` — 이 열 하나만 다르다 */
-  nameKey: keyof T & string
-  nameTitle: string
   /** 값이 바뀐 줄 하나를 통째로 돌려준다 */
-  onChange: (item: T) => void
+  onChange: (item: PlanWorkItem) => void
   onRemove: (id: string) => void
   onAdd: () => void
-  adding?: boolean
   emptyText: string
 }
 
 /**
- * 계획 데이터를 표에서 직접 입력한다.
+ * 계획 공정을 표에서 직접 입력한다.
  *
  * 엑셀 업로드를 받지 않으므로 여기가 유일한 입력 경로다.
  * 셀에 항상 입력칸이 깔려 있어 클릭하면 바로 타이핑되고, 칸 안에 또 테두리가
  * 생기지 않게 `variant="borderless"`를 쓴다 — 격자는 표가 그린다.
  *
- * 수량은 antd `InputNumber`에 맡긴다. 자재 수량은 면적(m²)이나 길이(m)라 소수가
+ * 수량은 antd `InputNumber`에 맡긴다. 수량이 면적(m²)이나 길이(m)라 소수가
  * 흔한데, 입력 도중의 `12.`이 사라지지 않게 붙드는 처리를 직접 하지 않아도 된다.
+ *
+ * **공종만 고르는 칸이다.** 사진대지 `구 분`과 같은 목록에서 고른다 —
+ * 자유 입력이면 등록되지 않은 이름이 들어와 계획 대비 현황에서 짝을 못 찾는다.
  */
-export function PlanItemTable<T extends PlanItemBase>({
+export function PlanItemTable({
   items,
+  workTypes,
   loading,
-  nameKey,
-  nameTitle,
   onChange,
   onRemove,
   onAdd,
-  adding,
   emptyText,
-}: PlanItemTableProps<T>) {
+}: PlanItemTableProps) {
   /** 글자 칸 하나 */
-  function textCell(key: keyof T & string, placeholder?: string): ColumnType<T>['render'] {
+  function textCell(
+    key: 'location' | 'description' | 'unit',
+    placeholder?: string,
+  ): ColumnType<PlanWorkItem>['render'] {
     return (_, row) => (
       <Input
         variant="borderless"
         size="small"
         placeholder={placeholder}
-        value={(row[key] as string | null) ?? ''}
+        value={row[key] ?? ''}
         onChange={(event) => onChange({ ...row, [key]: event.target.value })}
       />
     )
@@ -55,7 +57,7 @@ export function PlanItemTable<T extends PlanItemBase>({
 
   return (
     <Flex vertical gap={8}>
-      <DataTable<T>
+      <DataTable<PlanWorkItem>
         rowKey="id"
         loading={loading}
         dataSource={items}
@@ -70,10 +72,30 @@ export function PlanItemTable<T extends PlanItemBase>({
           {
             title: '공종',
             dataIndex: 'workType',
-            width: 140,
-            render: textCell('workType', '덕트'),
+            width: 150,
+            render: (_, row) => (
+              <Select
+                variant="borderless"
+                size="small"
+                showSearch
+                placeholder="공종 선택"
+                style={{ width: '100%' }}
+                value={row.workTypeId}
+                options={workTypes.map((workType) => ({
+                  value: workType.id,
+                  label: workType.name,
+                }))}
+                onChange={(workTypeId: number) =>
+                  onChange({
+                    ...row,
+                    workTypeId,
+                    workType: workTypes.find((w) => w.id === workTypeId)?.name ?? '',
+                  })
+                }
+              />
+            ),
           },
-          { title: nameTitle, dataIndex: nameKey, render: textCell(nameKey) },
+          { title: '작업내용', dataIndex: 'description', render: textCell('description') },
           {
             title: '계획 수량',
             dataIndex: 'quantity',
@@ -110,7 +132,7 @@ export function PlanItemTable<T extends PlanItemBase>({
       />
 
       <div>
-        <Button icon={<PlusOutlined />} loading={adding} onClick={onAdd}>
+        <Button icon={<PlusOutlined />} onClick={onAdd}>
           줄 추가
         </Button>
       </div>

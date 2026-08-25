@@ -6,40 +6,45 @@
  * 지금 모델링하지 않는다 — 확정되면 여기에 필드를 더한다.
  */
 
-/** 프로젝트(공사 현장) */
+/**
+ * 프로젝트(공사 현장).
+ *
+ * 서버가 쥔 것은 이 넷뿐이다. 공사 기간은 서버에 자리가 없어 화면에서도 받지 않는다 —
+ * 저장되지 않는 칸을 두면 입력한 사람은 저장된 줄 안다.
+ */
 export interface Project {
+  /**
+   * 서버가 채번한 정수를 문자열로 받아 쓴다.
+   * 프로젝트 id는 늘 주소창을 거쳐 다니고(`/projects/:projectId/...`)
+   * `useParams`가 주는 값은 문자열이라, 경계에서 한 번 맞추면 화면과 나머지 API가
+   * 전부 같은 모양을 쓴다(`src/api/projects.ts`의 `toProject`).
+   */
   id: string
   /** 공사명 */
   name: string
-  /** 현장명 */
-  siteName: string
-  startDate: string | null
-  endDate: string | null
+  /** 현장 주소 */
+  address: string
   createdAt: string
 }
 
 /**
- * 계획 데이터 한 줄이 공통으로 갖는 필드.
- * 공정과 자재는 이름 칸 하나(`description` / `material`)만 다르다.
+ * 계획 공정 한 줄.
+ *
+ * **자재 계획은 두지 않는다.** 서버가 자재 실적을 따로 재지 않고 확정된 작업 수량을
+ * 자재 사용량으로 갈음해서, 계획 자재와 견줘봐야 단위가 다른 숫자를 나눈 값이 나온다.
  */
-export interface PlanItemBase {
+export interface PlanWorkItem {
   id: string
-  projectId: string
   /** 위치 — 현장 양식에서 '지하2층'처럼 한 칸으로 쓰인다 */
   location: string
+  /** 공종 id. 서버가 이걸로 받는다. 아직 안 고른 새 줄은 null */
+  workTypeId: number | null
+  /** 공종 이름 — 화면에 보이는 값 */
   workType: string
+  /** 작업내용 */
+  description: string
   quantity: number | null
   unit: string | null
-}
-
-/** 계획 공정 데이터 한 줄 */
-export interface PlanWorkItem extends PlanItemBase {
-  description: string
-}
-
-/** 계획 자재 데이터 한 줄 */
-export interface PlanMaterialItem extends PlanItemBase {
-  material: string
 }
 
 /**
@@ -65,8 +70,14 @@ export type ReviewStatus = 'pending' | 'confirmed'
  * (양식이 제공하는 칸 수는 `SHEET_ENTRY_SLOTS`).
  */
 export interface WorkEntry {
+  /**
+   * 서버 항목(`item`) id. 확정할 때 어느 항목을 고치는지 이걸로 가리킨다.
+   * **사람이 새로 만든 칸에는 없다** — 서버에 아직 항목을 새로 만드는 자리가 없다.
+   */
+  itemId?: number
   /** 규격 — '1300*800' 같은 자유 텍스트 */
   spec: string | null
+  /** 수량 — 현장이 적은 개수(`rawQuantity`). 둘레 연장 환산은 집계가 한다 */
   quantity: number | null
   /** AI가 자신 없게 채운 칸 → 확인이 필요한 사유. 사람이 고치면 지운다 */
   uncertain?: Uncertain<'spec' | 'quantity'>
@@ -97,8 +108,8 @@ export interface Photo {
   seq: number
   fileName: string
   originalUrl: string
-  /** AI가 분리한 작업 사진. 분리 실패 시 null이며 원본을 대신 쓴다 */
-  croppedUrl: string | null
+  /** 격자에 거는 축소본. 한 화면에 수십 장이 깔려 원본을 그대로 걸지 않는다 */
+  thumbnailUrl: string | null
   status: PhotoStatus
   failureReason: string | null
   workDate: string | null
@@ -129,23 +140,20 @@ export interface WorkType {
 /** 계획 대비 비교 결과 */
 export type CompareStatus = 'match' | 'over' | 'under' | 'insufficient'
 
-/** 공정·자재 비교가 공유하는 필드 */
-export interface ComparisonBase {
-  key: string
-  location: string
-  workType: string
-  plannedQuantity: number | null
-  actualQuantity: number | null
+/**
+ * 계획 대비 현황 한 줄.
+ *
+ * **공종 단위다.** 계획은 위치·작업내용까지 적지만 실적은 공종까지만 되짚을 수 있어
+ * 서버가 공종으로 합쳐서 준다. 그래서 이 표에는 위치 열이 없다.
+ */
+export interface ComparisonRow {
+  workTypeId: number
+  workTypeName: string
   unit: string | null
+  plannedQuantity: number
+  actualQuantity: number
+  /** 달성률(%). 계획이 없으면 서버가 0을 준다 */
+  achievementRate: number
+  /** 계획과 실적을 견준 결과. 서버 값이 아니라 화면이 붙인다 */
   status: CompareStatus
-}
-
-/** 공정 비교 한 줄 */
-export interface WorkComparisonRow extends ComparisonBase {
-  description: string
-}
-
-/** 자재 비교 한 줄 */
-export interface MaterialComparisonRow extends ComparisonBase {
-  material: string
 }

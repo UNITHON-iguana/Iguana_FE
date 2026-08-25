@@ -447,7 +447,7 @@ export function PhotoSheetGrid({
                             className={styles.photo}
                             width={PHOTO_WIDTH}
                             height={PHOTO_HEIGHT}
-                            src={photo.croppedUrl ?? photo.originalUrl}
+                            src={photo.thumbnailUrl ?? photo.originalUrl}
                             preview={{ src: photo.originalUrl }}
                             alt=""
                           />

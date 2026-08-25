@@ -57,7 +57,7 @@ export function AppLayout() {
           <>
             <span style={{ color: token.colorSplit }}>|</span>
             <Typography.Text style={{ fontSize: 13 }}>{project.name}</Typography.Text>
-            <Typography.Text type="secondary">{project.siteName}</Typography.Text>
+            <Typography.Text type="secondary">{project.address}</Typography.Text>
           </>
         )}
       </Header>

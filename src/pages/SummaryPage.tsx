@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, App, Button, DatePicker, Empty, Flex, Tabs, Typography } from 'antd'
+import { Alert, App, Button, DatePicker, Empty, Flex, Tabs, Tooltip, Typography } from 'antd'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { Link, useParams } from 'react-router'
@@ -169,14 +169,20 @@ export function SummaryPage() {
           <Typography.Text type="secondary">
             공종 {source.rows.length}행 · 작업일 {daily.columns.length}일
           </Typography.Text>
-          <Button
-            type="primary"
-            icon={<DownloadOutlined />}
-            loading={exporting}
-            onClick={downloadExcel}
-          >
-            엑셀 내려받기
-          </Button>
+          {/*
+            엑셀에는 기간 파라미터가 없어 늘 프로젝트 전체가 담긴다.
+            화면은 한 달만 보고 있으므로, 받기 전에 무엇이 담기는지 밝힌다.
+          */}
+          <Tooltip title="고른 달과 상관없이 프로젝트 전체 기간이 담깁니다">
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              loading={exporting}
+              onClick={downloadExcel}
+            >
+              엑셀 내려받기
+            </Button>
+          </Tooltip>
         </Flex>
       </Flex>
 
