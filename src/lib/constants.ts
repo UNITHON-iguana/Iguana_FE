@@ -3,9 +3,6 @@ export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png'] as const
 
 export const ACCEPTED_IMAGE_EXTENSIONS = '.jpg,.jpeg,.png'
 
-/** 계획 데이터 업로드가 허용하는 엑셀 형식 */
-export const ACCEPTED_EXCEL_EXTENSIONS = '.xlsx'
-
 /**
  * 사진대지 한 페이지에 올리는 사진 수.
  *

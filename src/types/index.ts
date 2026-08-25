@@ -18,27 +18,28 @@ export interface Project {
   createdAt: string
 }
 
-/** 계획 공정 데이터 한 줄 */
-export interface PlanWorkItem {
+/**
+ * 계획 데이터 한 줄이 공통으로 갖는 필드.
+ * 공정과 자재는 이름 칸 하나(`description` / `material`)만 다르다.
+ */
+export interface PlanItemBase {
   id: string
   projectId: string
   /** 위치 — 현장 양식에서 '지하2층'처럼 한 칸으로 쓰인다 */
   location: string
   workType: string
-  description: string
   quantity: number | null
   unit: string | null
 }
 
+/** 계획 공정 데이터 한 줄 */
+export interface PlanWorkItem extends PlanItemBase {
+  description: string
+}
+
 /** 계획 자재 데이터 한 줄 */
-export interface PlanMaterialItem {
-  id: string
-  projectId: string
-  location: string
-  workType: string
+export interface PlanMaterialItem extends PlanItemBase {
   material: string
-  quantity: number | null
-  unit: string | null
 }
 
 /**
@@ -109,40 +110,17 @@ export interface Photo {
 }
 
 /**
- * 집계 단위.
- * `EA`는 개소를 센다. `M`은 규격의 가로*세로에서 둘레를 뽑아 연장 길이를 센다.
- */
-export type AggregateUnit = 'EA' | 'M'
-
-/**
- * 집계 품목 한 종 — 집계표의 행 하나.
+ * 공종 — 사진대지의 `구 분`.
  *
- * **백엔드가 구분과 함께 내려준다.** 계수·소구경 경계·HB 묶음은 전부 현장과
- * 발주처마다 달라지는 업무 규칙이라 프론트에 상수로 두지 않는다.
- * 화면은 이 목록이 준 순서대로 행을 깔고, 시킨 대로 묶고 곱하기만 한다.
- *
- * 값이 하나도 없는 품목도 행은 남는다 — 기성 청구 양식이라 행 목록과 순서가 고정이다.
+ * **이름만 등록한다.** 규격은 사진마다 AI가 읽고, 단위는 서버가 정한다 —
+ * 규격이 `2000*600`처럼 오면 둘레 연장으로 환산하므로 사람이 미리 고를 수 있는 값이 아니다.
+ * 프로젝트마다 다르고, 사진대지는 이 목록에서 골라 넣는다.
  */
-export interface AggregateItem {
+export interface Trade {
   id: string
-  /** 집계표에 찍히는 품목명 (예: '금속관벽체50') */
+  projectId: string
+  /** 공종명 (예: '금속관벽체') */
   name: string
-  /** 사진대지의 `구분`과 맞춰볼 값 (예: '금속관벽체') */
-  category: string
-  /**
-   * 사진대지의 `규격`과 맞춰볼 값.
-   * 배관류는 호칭경('50')으로 품목이 갈리고, 덕트류는 구분 하나가 한 품목이라 null이다.
-   * null이면 그 구분의 모든 규격을 이 품목으로 받는다.
-   */
-  spec: string | null
-  unit: AggregateUnit
-  /**
-   * HB 가공 계수.
-   * 벽체는 앞뒤 양면을 시공하므로 2, 입상이나 슬리브처럼 단면이면 1이다.
-   */
-  multiplier: number
-  /** HB 가공에서 묶일 이름 (예: 'HB 배관(소구경)') */
-  hbGroup: string
 }
 
 /** 계획 대비 비교 결과 */
