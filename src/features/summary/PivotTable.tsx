@@ -1,14 +1,12 @@
 import { Table, Typography } from 'antd'
 import type { ColumnType } from 'antd/es/table'
 
+import type { AggregationRow } from '@/api/aggregation'
 import { HEADER_BG } from '@/app/theme'
 import { numberColumn } from '@/components/columns'
 import { DataTable } from '@/components/DataTable'
-import { AGGREGATE_UNIT_LABEL } from '@/lib/constants'
 
-import type { Pivot, PivotRow } from './aggregate'
-
-/** 열 하나의 폭. 작업일이 스무 개를 넘어서 좁게 잡는다 */
+/** 열 하나의 폭. 작업일이 서른 개까지 가므로 좁게 잡는다 */
 const VALUE_WIDTH = 72
 
 /** 합계 줄 — 사진대지 양식의 라벨 칸과 같은 회색을 쓴다 */
@@ -23,57 +21,71 @@ function formatValue(value: number | undefined) {
   return value.toLocaleString('ko-KR', { maximumFractionDigits: 2 })
 }
 
+/** 같은 행이 여러 번 안 겹치게 공종과 규격을 합친 키 */
+function rowKey(row: AggregationRow) {
+  return `${row.workTypeId}:${row.spec ?? ''}`
+}
+
 export interface PivotTableProps {
-  pivot: Pivot
+  /** 열 이름. 작업일이거나 월이다 */
+  columns: string[]
+  rows: AggregationRow[]
+  totals: Record<string, number>
+  grandTotal: number
   /** 열 이름을 머리글 표기로 바꾼다 */
   formatColumn: (column: string) => string
-  /** 맨 오른쪽에 행 합계 열을 붙인다 */
-  totalColumn?: string
-  /** 맨 아래에 열 합계 줄을 붙인다 */
-  showFooter?: boolean
+  /** 맨 오른쪽 행 합계 열의 머리글 */
+  totalColumn: string
 }
 
 /**
  * 집계표 한 덩어리.
  *
- * 일일작업현황·HB·기성누계가 모두 같은 모양이라 한 컴포넌트로 그린다.
- * 행 머리와 단위는 왼쪽에 고정하고 값 열만 가로로 흐른다.
+ * 서버가 만든 행을 그대로 그린다 — 여기서 더하거나 곱하지 않는다.
+ * 공종과 규격은 왼쪽에 고정하고 값 열만 가로로 흐른다.
  */
-export function PivotTable({ pivot, formatColumn, totalColumn, showFooter }: PivotTableProps) {
-  const valueColumns: ColumnType<PivotRow>[] = pivot.columns.map((column) =>
-    numberColumn<PivotRow>({
+export function PivotTable({
+  columns,
+  rows,
+  totals,
+  grandTotal,
+  formatColumn,
+  totalColumn,
+}: PivotTableProps) {
+  const valueColumns: ColumnType<AggregationRow>[] = columns.map((column) =>
+    numberColumn<AggregationRow>({
       title: formatColumn(column),
       width: VALUE_WIDTH,
-      render: (_, row) => formatValue(row.values[column]),
+      render: (_, row) => formatValue(row.quantityByDate[column]),
     }),
   )
 
-  if (totalColumn) {
-    valueColumns.push(
-      numberColumn<PivotRow>({
-        title: totalColumn,
-        width: 96,
-        fixed: 'right',
-        render: (_, row) => <Typography.Text strong>{formatValue(row.total)}</Typography.Text>,
-      }),
-    )
-  }
+  valueColumns.push(
+    numberColumn<AggregationRow>({
+      title: totalColumn,
+      width: 96,
+      fixed: 'right',
+      render: (_, row) => <Typography.Text strong>{formatValue(row.total)}</Typography.Text>,
+    }),
+  )
 
   return (
-    <DataTable<PivotRow>
-      rowKey="key"
-      dataSource={pivot.rows}
+    <DataTable<AggregationRow>
+      rowKey={rowKey}
+      dataSource={rows}
       scroll={{ x: 'max-content' }}
-      locale={{ emptyText: '집계된 품목이 없습니다.' }}
+      locale={{ emptyText: '집계된 공종이 없습니다.' }}
       columns={[
-        { title: '구 분', dataIndex: 'label', width: 168, fixed: 'left' },
+        { title: '구 분', dataIndex: 'workTypeName', width: 168, fixed: 'left' },
         {
-          title: '단위',
-          dataIndex: 'unit',
-          width: 56,
+          title: '규격',
+          dataIndex: 'spec',
+          width: 96,
           fixed: 'left',
-          render: (unit: PivotRow['unit']) => AGGREGATE_UNIT_LABEL[unit],
+          // 규격이 없는 행은 둘레 연장으로 접힌 것이다 — 빈 칸이 아니라 '-'로 둔다
+          render: (spec: string | null) => spec ?? '-',
         },
+        { title: '단위', dataIndex: 'unit', width: 56, fixed: 'left' },
         ...valueColumns,
         /*
          * 남는 폭을 받아내는 빈 열.
@@ -81,29 +93,24 @@ export function PivotTable({ pivot, formatColumn, totalColumn, showFooter }: Piv
          */
         { title: '' },
       ]}
-      summary={
-        showFooter
-          ? () => (
-              <Table.Summary fixed>
-                <Table.Summary.Row style={totalRowStyle}>
-                  <Table.Summary.Cell index={0}>합계</Table.Summary.Cell>
-                  <Table.Summary.Cell index={1} />
-                  {pivot.columns.map((column, i) => (
-                    <Table.Summary.Cell key={column} index={2 + i} align="right">
-                      {formatValue(pivot.totals[column])}
-                    </Table.Summary.Cell>
-                  ))}
-                  {totalColumn && (
-                    <Table.Summary.Cell index={2 + pivot.columns.length} align="right">
-                      {formatValue(pivot.grandTotal)}
-                    </Table.Summary.Cell>
-                  )}
-                  <Table.Summary.Cell index={2 + pivot.columns.length + (totalColumn ? 1 : 0)} />
-                </Table.Summary.Row>
-              </Table.Summary>
-            )
-          : undefined
-      }
+      summary={() => (
+        <Table.Summary fixed>
+          <Table.Summary.Row style={totalRowStyle}>
+            <Table.Summary.Cell index={0}>합계</Table.Summary.Cell>
+            <Table.Summary.Cell index={1} />
+            <Table.Summary.Cell index={2} />
+            {columns.map((column, i) => (
+              <Table.Summary.Cell key={column} index={3 + i} align="right">
+                {formatValue(totals[column])}
+              </Table.Summary.Cell>
+            ))}
+            <Table.Summary.Cell index={3 + columns.length} align="right">
+              {formatValue(grandTotal)}
+            </Table.Summary.Cell>
+            <Table.Summary.Cell index={4 + columns.length} />
+          </Table.Summary.Row>
+        </Table.Summary>
+      )}
     />
   )
 }

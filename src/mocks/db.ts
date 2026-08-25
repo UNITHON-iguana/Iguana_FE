@@ -102,8 +102,8 @@ export const planMaterialItems: PlanMaterialItem[] = [
  * 같은 인상을 주는지 눈으로 확인할 수 있게 했다.
  * `uncertain`이 붙은 칸은 AI가 자신 없게 채운 칸이라 사진대지에서 노랗게 뜬다.
  *
- * 검수 상태는 분석이 끝난 뒤의 모습을 그대로 담는다 — 확인할 칸이 없는 사진은
- * 자동으로 `confirmed`, 확인할 칸이 남은 사진과 분석 실패 사진만 `pending`이다.
+ * 검수 상태는 며칠 일한 현장의 모습이다 — 지난 것은 반영을 마쳤고(`confirmed`),
+ * 확인할 칸이 남은 사진과 아직 반영을 안 누른 사진이 `pending`으로 섞여 있다.
  */
 let seq = 623
 
@@ -177,8 +177,11 @@ function bulkPhotos(): Photo[] {
       fileName: `KakaoTalk_bulk_${String(i + 1).padStart(3, '0')}.jpg`,
       workDate: BULK_DATES[i % BULK_DATES.length],
       location: BULK_LOCATIONS[i % BULK_LOCATIONS.length],
-      // 확인할 칸이 없는 사진은 분석 직후 자동으로 확정된다. 미검수로 남는 건 못 읽은 사진뿐
-      reviewStatus: unread ? 'pending' : 'confirmed',
+      /*
+       * 확정은 사람이 반영을 눌러야 일어난다.
+       * 손볼 것이 없는데 아직 반영 안 한 사진도 섞어 둔다 — 반영 버튼이 잡을 대상이다.
+       */
+      reviewStatus: unread || i % 5 === 2 ? 'pending' : 'confirmed',
       workItems: [
         item(`wb${i}_1`, sample.category, sample.spec, sample.quantity),
         unread
