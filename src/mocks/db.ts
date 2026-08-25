@@ -143,6 +143,63 @@ function item(
   }
 }
 
+/*
+ * 볼륨 확인용 사진.
+ *
+ * 실제 현장은 하루에 수백 장이 올라온다. 손으로 적은 여섯 장만으로는
+ * 페이지네이션과 작업일 필터가 도는지 볼 수 없어 같은 모양으로 늘려둔다.
+ * 값은 위 여섯 장의 조합을 돌려쓴다 — 집계 숫자를 눈으로 검산할 수 있게 단순하게 둔다.
+ */
+const BULK_SAMPLES: { category: string; spec: string; quantity: number }[] = [
+  { category: '무보온덕트벽체', spec: '2000*600', quantity: 0.5 },
+  { category: '보온덕트벽체', spec: '2000*800', quantity: 1 },
+  { category: '차열재마감', spec: '1300*800', quantity: 0.5 },
+  { category: '금속관벽체', spec: '50', quantity: 1 },
+  { category: '금속관벽체', spec: '100', quantity: 0.5 },
+  { category: '금속관입상', spec: '150', quantity: 2 },
+  { category: '오픈구', spec: '2000*200', quantity: 0.5 },
+  { category: '슬리브', spec: '100', quantity: 1 },
+]
+
+const BULK_DATES = ['2026-08-18', '2026-08-19', '2026-08-20', '2026-08-24']
+const BULK_LOCATIONS = ['리테일 4층', '리테일 3층', '지하 2층', '지하 1층']
+const BULK_COUNT = 74
+
+function bulkPhotos(): Photo[] {
+  return Array.from({ length: BULK_COUNT }, (_, i) => {
+    const sample = BULK_SAMPLES[i % BULK_SAMPLES.length]
+    const second = BULK_SAMPLES[(i + 3) % BULK_SAMPLES.length]
+    // 일곱 장에 한 장꼴로 AI가 수량을 못 읽은 사진을 섞는다
+    const unread = i % 7 === 3
+
+    return photo({
+      id: `phb${i}`,
+      fileName: `KakaoTalk_bulk_${String(i + 1).padStart(3, '0')}.jpg`,
+      workDate: BULK_DATES[i % BULK_DATES.length],
+      location: BULK_LOCATIONS[i % BULK_LOCATIONS.length],
+      // 확인할 칸이 없는 사진은 분석 직후 자동으로 확정된다. 미검수로 남는 건 못 읽은 사진뿐
+      reviewStatus: unread ? 'pending' : 'confirmed',
+      workItems: [
+        item(`wb${i}_1`, sample.category, sample.spec, sample.quantity),
+        unread
+          ? {
+              id: `wb${i}_2`,
+              category: second.category,
+              entries: [
+                {
+                  spec: second.spec,
+                  quantity: null,
+                  uncertain: { quantity: '수량을 읽지 못했습니다' },
+                },
+                { spec: null, quantity: null },
+              ],
+            }
+          : item(`wb${i}_2`, second.category, second.spec, second.quantity),
+      ],
+    })
+  })
+}
+
 export const photos: Photo[] = [
   photo({
     id: 'ph1',
@@ -214,4 +271,5 @@ export const photos: Photo[] = [
     location: null,
     workItems: [],
   }),
+  ...bulkPhotos(),
 ]
