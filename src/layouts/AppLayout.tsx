@@ -7,12 +7,18 @@ import { getProject } from '@/api/projects'
 
 const { Header, Sider, Content } = Layout
 
+/**
+ * 프로젝트 메뉴.
+ *
+ * 사진대지가 본 화면이다 — 사진 올리기·AI 분석·검수가 모두 거기서 끝나고,
+ * 집계와 내보내기가 그 결과를 받아 쓴다.
+ * 계획은 이 흐름 없이도 돌아가는 곁가지라 구분선 아래에 둔다.
+ */
 const PROJECT_MENU = [
-  { key: 'plan', label: '계획 데이터' },
-  { key: 'upload', label: '사진 업로드·분석' },
-  { key: 'review', label: '검수' },
-  { key: 'compare', label: '계획 대비 현황' },
+  { key: 'sheet', label: '사진대지' },
+  { key: 'summary', label: '집계' },
   { key: 'export', label: '내보내기' },
+  { key: 'plan', label: '계획', divided: true },
 ]
 
 export function AppLayout() {
@@ -64,10 +70,13 @@ export function AppLayout() {
               mode="inline"
               selectedKeys={[activeKey]}
               style={{ height: '100%', borderInlineEnd: 'none', paddingTop: 8 }}
-              items={PROJECT_MENU.map((item) => ({
-                ...item,
-                label: <Link to={`/projects/${projectId}/${item.key}`}>{item.label}</Link>,
-              }))}
+              items={PROJECT_MENU.flatMap((item) => [
+                ...(item.divided ? [{ type: 'divider' as const, key: `${item.key}-divider` }] : []),
+                {
+                  key: item.key,
+                  label: <Link to={`/projects/${projectId}/${item.key}`}>{item.label}</Link>,
+                },
+              ])}
             />
           </Sider>
         )}
