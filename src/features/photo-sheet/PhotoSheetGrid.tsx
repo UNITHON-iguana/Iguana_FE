@@ -66,8 +66,29 @@ function without<K extends string>(
 }
 
 /**
+ * 화면이 깐 빈 줄이면 그 줄이 앉은 **자리 번호**, 아니면 null.
+ *
+ * 빈 줄의 id는 사진 id와 자리 번호로 짓는다(`${photo.id}__blank2`).
+ * 렌더마다 같은 값이 나와야 React가 같은 줄로 보고 입력 중이던 칸의 포커스를
+ * 지킨다 — 매번 새 id를 만들면 한 글자 칠 때마다 입력칸이 새로 달린다.
+ */
+function blankSlot(photo: Photo, item: WorkItem): number | null {
+  const prefix = `${photo.id}${BLANK_ROW}`
+  if (!item.id.startsWith(prefix)) return null
+  const slot = Number(item.id.slice(prefix.length))
+  return Number.isInteger(slot) ? slot : null
+}
+
+/**
  * 양식이 정한 줄 수·칸 수만큼 빈 칸을 채운다.
  * 항목 개수 자체는 제한하지 않는다 — 모자랄 때만 채운다.
+ *
+ * **빈 줄은 자리를 잡아두고, 사람이 값을 친 줄은 그 자리에 그대로 둔다.**
+ * 빈 줄에 값을 치면 그 줄은 사진에 붙어 다음 렌더에 `photo.workItems`로 돌아오는데,
+ * 그때 자리를 다시 세면 방금 친 줄과 새로 까는 빈 줄이 같은 id를 갖게 된다.
+ * 같은 key를 단 줄이 둘이면 React가 표를 엉뚱하게 짜맞춰 사진 덩어리가 통째로
+ * 겹쳐 보인다. 자리 번호를 id에 박아두고 그 자리에 도로 꽂으면 겹칠 일도,
+ * 친 줄이 위로 튀어 오를 일도 없다.
  */
 function withFormSlots(photo: Photo): WorkItem[] {
   const items = photo.workItems
@@ -79,26 +100,29 @@ function withFormSlots(photo: Photo): WorkItem[] {
       return { ...item, entries: [...item.entries, ...Array.from({ length: missing }, emptyEntry)] }
     })
 
-  const padding = Math.max(0, DEFAULT_WORK_ITEM_ROWS - items.length)
+  /* 서버가 준 줄과 '줄 추가'로 늘린 줄은 순서 그대로, 빈 줄에서 온 줄은 자기 자리로 */
+  const fixed = items.filter((item) => blankSlot(photo, item) === null)
+  const bySlot = new Map<number, WorkItem>()
+  for (const item of items) {
+    const slot = blankSlot(photo, item)
+    if (slot !== null) bySlot.set(slot, item)
+  }
+
+  // 자리가 비어도 그 아래 자리에 값이 있으면 줄을 줄이지 않는다
+  const taken = [...bySlot.keys()].map((slot) => slot + 1)
+  const slots = Math.max(DEFAULT_WORK_ITEM_ROWS - fixed.length, ...taken, 0)
   return [
-    ...items,
-    /*
-     * 빈 줄의 id를 사진 id와 **화면에서의 줄 번호**로 만든다.
-     * 사진 id에서 만드는 것은 렌더마다 같은 값이 나오게 하려는 것이다 —
-     * 매번 새 id를 만들면 React가 다른 줄로 보고 입력 중이던 칸의 포커스가 날아간다.
-     * 줄 번호를 쓰는 것은 빈 줄에 값을 쳐서 진짜 항목이 된 뒤에도 겹치지 않게 하려는
-     * 것이다. 0부터 다시 세면 이미 올라간 줄과 같은 id가 나오고, 같은 key를 단 줄이
-     * 둘이면 React가 표를 엉뚱하게 짜맞춘다.
-     */
-    ...Array.from({ length: padding }, (_, i) =>
-      emptyItem(`${photo.id}${BLANK_ROW}${items.length + i}`),
+    ...fixed,
+    ...Array.from(
+      { length: slots },
+      (_, slot) => bySlot.get(slot) ?? emptyItem(`${photo.id}${BLANK_ROW}${slot}`),
     ),
   ]
 }
 
 /** 화면이 만든 빈 줄인가 — 사람이 값을 치기 전까지는 사진에 붙지 않는다 */
 function isBlankRow(photo: Photo, item: WorkItem): boolean {
-  return item.id.startsWith(`${photo.id}${BLANK_ROW}`) && !hasContent(item)
+  return blankSlot(photo, item) !== null && !hasContent(item)
 }
 
 export interface PhotoSheetGridProps {

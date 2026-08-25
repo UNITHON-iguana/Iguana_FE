@@ -84,7 +84,7 @@ export function PlanPage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.workComparison(projectId) })
   }
 
-  /* `useRowAutosave`는 렌더마다 같은 참조를 요구한다 — 매번 새로 만들면 예약이 앞당겨 나간다 */
+  /* `useRowAutosave`는 렌더마다 같은 참조를 요구한다 — 매번 새로 만들면 저장이 앞당겨 나간다 */
   const save = useRowAutosave<PlanWorkItem>(
     useCallback((item: PlanWorkItem) => savePlanWorkItem(projectId, item), [projectId]),
   )
@@ -100,7 +100,9 @@ export function PlanPage() {
       if (latest && latest !== sent) {
         const merged = { ...latest, id: created.id, workTypeId: created.workTypeId }
         setEdits((prev) => ({ ...prev, [created.id]: merged }))
-        save(merged)
+        // 등록을 기다리는 동안 손은 이미 이 줄을 떠났을 수 있다. 붙들지 말고 지금 보낸다
+        save.edit(merged)
+        save.leave(merged)
       }
       setDrafts((prev) => prev.filter((draft) => draft.id !== sent.id))
       draftLatest.current.delete(sent.id)
@@ -119,14 +121,14 @@ export function PlanPage() {
   /**
    * 값이 바뀐 줄 하나.
    *
-   * 서버에 있는 줄은 늘 하던 대로 잠깐 뒤에 저장한다.
+   * 서버에 있는 줄은 화면에만 얹어두고 그 줄에서 손을 뗄 때 보낸다(`onLeave`).
    * 아직 없는 줄은 **공종이 정해지는 순간** 등록한다 — 서버가 공종을 필수로 받아
    * 빈 줄을 먼저 만들어둘 수 없기 때문이다. 그 전까지는 화면에만 있다.
    */
   function change(item: PlanWorkItem) {
     if (!item.id.startsWith(NEW_ROW)) {
       setEdits((prev) => ({ ...prev, [item.id]: item }))
-      save(item)
+      save.edit(item)
       return
     }
 
@@ -204,6 +206,7 @@ export function PlanPage() {
                 loading={isLoading}
                 emptyText="계획 공정이 없습니다. 줄 추가로 입력하세요."
                 onChange={change}
+                onLeave={save.leave}
                 onRemove={removeRow}
                 onAdd={addRow}
               />
