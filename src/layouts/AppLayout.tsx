@@ -48,7 +48,7 @@ export function AppLayout() {
       >
         <Link to="/projects" style={{ color: token.colorText }}>
           <Typography.Text strong style={{ fontSize: 14 }}>
-            현장노트 AI
+            문서반장
           </Typography.Text>
         </Link>
 
