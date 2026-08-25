@@ -11,14 +11,17 @@ const { Header, Sider, Content } = Layout
  * 프로젝트 메뉴.
  *
  * 사진대지가 본 화면이다 — 사진 올리기·AI 분석·검수가 모두 거기서 끝나고,
- * 집계와 내보내기가 그 결과를 받아 쓴다.
- * 계획은 이 흐름 없이도 돌아가는 곁가지라 구분선 아래에 둔다.
+ * 집계가 그 결과를 받아 쓴다.
+ * 내보내기는 메뉴에 없다. 사진대지와 집계가 각자 자기 화면의 것을 내보낸다.
+ *
+ * 구분선 아래는 흐름이 아니라 프로젝트가 쥐고 있는 설정이다.
+ * 공종은 사진대지 입력과 집계가 둘 다 참조하는 사전이라 계획보다 위에 둔다.
  */
 const PROJECT_MENU = [
   { key: 'sheet', label: '사진대지' },
   { key: 'summary', label: '집계' },
-  { key: 'export', label: '내보내기' },
-  { key: 'plan', label: '계획', divided: true },
+  { key: 'trades', label: '공종', divided: true },
+  { key: 'plan', label: '계획' },
 ]
 
 export function AppLayout() {
