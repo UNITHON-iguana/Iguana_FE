@@ -120,6 +120,8 @@ export function SheetPage() {
    * 화면을 떠나며 보내는 마지막 한 장은 렌더 밖에서 나가므로 ref로 최신값을 쥐고 있는다.
    */
   const latestWorkTypes = useRef<WorkType[]>([])
+  /* 같은 이유로 무효화도 ref로 쥔다 — 정리 함수는 첫 렌더의 `projectId`에 붙들려 있다 */
+  const latestInvalidateTotals = useRef(() => {})
 
   const { data: project } = useQuery({
     queryKey: queryKeys.project(projectId),
@@ -169,7 +171,25 @@ export function SheetPage() {
   const items = data?.items ?? []
   const total = data?.total ?? 0
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.photos(projectId) })
+  /**
+   * 사진이 바뀌면 실적도 바뀐다.
+   *
+   * 집계와 계획 대비 현황은 확정된 사진을 세지만 사진 목록과 **다른 키로 따로 받아온다**
+   * (`aggregation`, `workComparison`). 사진만 상해 놓으면 그 두 표는 묵은 숫자를 그대로
+   * 들고 있다 — `staleTime`이 지나야 비로소 다시 받는다.
+   */
+  const invalidateTotals = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.aggregation(projectId) })
+    queryClient.invalidateQueries({ queryKey: queryKeys.workComparison(projectId) })
+  }
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.photos(projectId) })
+    invalidateTotals()
+  }
+  useEffect(() => {
+    latestInvalidateTotals.current = invalidateTotals
+  })
 
   /**
    * 사진을 올린다 — **분석까지 이 한 번에 끝난다.**
@@ -210,17 +230,25 @@ export function SheetPage() {
   useEffect(() => {
     const pendingPhotos = waiting.current
     const workTypesAtUnmount = latestWorkTypes
+    const invalidateAtUnmount = latestInvalidateTotals
     return () => {
+      if (pendingPhotos.size === 0) return
       /*
        * 사진에서 손을 떼지 않은 채 화면을 떠나는 길이 있다 — 메뉴를 누르거나 뒤로 가기.
        * 그때 마지막 편집이 사라지지 않게 여기서 보낸다.
        */
-      pendingPhotos.forEach((photo) => {
+      const sent = [...pendingPhotos.values()].map((photo) =>
         savePhoto(photo, workTypesAtUnmount.current).catch(() => {
           // 떠나는 길이라 알릴 화면이 없다. 조용히 흘려보내되 터뜨리지는 않는다
-        })
-      })
+        }),
+      )
       pendingPhotos.clear()
+      /*
+       * 이 길로 곧장 집계로 가는 사람이 많다 — 메뉴가 바로 옆이다. 그 화면은 저장이
+       * 끝나기 전에 표를 이미 받아버리므로, 다 나간 뒤에 한 번 더 상해 놓아야
+       * 방금 확정된 사진이 숫자에 들어온다.
+       */
+      void Promise.all(sent).then(() => invalidateAtUnmount.current())
     }
   }, [])
 
@@ -292,10 +320,11 @@ export function SheetPage() {
      * 화면에 걸린 목록은 다시 받지 않는다(`refetchType: 'none'`) — 검수 탭은 확인할
      * 칸이 남은 사진만 주므로, 방금 끝낸 사진이 목록에서 빠지면 화면이 밀린다.
      * 목록은 탭·페이지·작업일을 옮길 때 새로 받는다.
-     * 대신 사진 데이터를 상한 것으로 표시해, 집계로 넘어가면 새 숫자가 나오게 한다.
      */
     queryClient.invalidateQueries({ queryKey: queryKeys.photos(projectId), refetchType: 'none' })
     queryClient.invalidateQueries({ queryKey: queryKeys.photoSummary(projectId, workDate) })
+    // 확정된 사진이 늘었을 수 있다 — 집계로 넘어가면 새 숫자가 나와야 한다
+    invalidateTotals()
   }
 
   /**
