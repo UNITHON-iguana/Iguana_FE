@@ -1,0 +1,184 @@
+/*
+ * 화면에서 편집하는 사진대지 양식.
+ *
+ * 원본 엑셀 양식과 같은 구조를 px 단위로 그린다.
+ * 사진 한 장 = tbody 하나. 사진번호와 사진 칸은 그 사진의 모든 줄에 걸쳐 병합된다.
+ *
+ * 색은 여기서 새로 정하지 않는다.
+ * antd가 내보내는 CSS 변수(--ant-*)를 쓰고, 양식 고유색(구분 칸 연녹색,
+ * 사진번호 빨강, 라벨 칸 배경)만 theme.ts에서 인라인으로 받는다.
+ */
+.sheet {
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+  color: var(--ant-color-text, #1f2328);
+  background: #fff;
+}
+
+.sheet td {
+  border: 1px solid var(--ant-color-border, #d4d8dd);
+  height: 30px;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 사진번호 — 원본 양식이 빨간 굵은 숫자를 쓴다 */
+.seqCell {
+  width: 48px;
+  border-inline-start: none !important;
+  border-block: none !important;
+  text-align: center;
+  vertical-align: top;
+  padding-top: 4px !important;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.photoCell {
+  width: 172px;
+  padding: 2px !important;
+  text-align: center;
+  vertical-align: top;
+}
+
+/* 크기는 PhotoSheetGrid가 props로 준다 — antd의 런타임 규칙이 CSS를 이기기 때문 */
+.photo {
+  display: block;
+  object-fit: cover;
+  cursor: zoom-in;
+  border: 1px solid var(--ant-color-text, #1f2328);
+}
+
+/* 사진 아래 줄 — 파일명과 줄 추가. 양식이 아니라 화면 도구다 */
+.photoTools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 1px 0;
+  color: var(--ant-color-text-tertiary, #818b98);
+  font-size: 11px;
+}
+
+.fileName {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* '구 분', '작업내용', '위 치' — 양식의 고정 라벨. 편집하지 않는다 */
+.label {
+  width: 62px;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  /* 라벨은 글자를 셀 가운데 두므로 인라인 패딩이 아니라 정렬로 맞춘다 */
+  text-indent: 0.25em;
+}
+
+.labelWide {
+  width: 74px;
+}
+
+.categoryCell {
+  width: 148px;
+}
+
+.specCell {
+  width: 96px;
+}
+
+.qtyCell {
+  width: 62px;
+}
+
+/* 두 번째 규격·수량 쌍 — 구분은 같고 규격만 다를 때 쓴다.
+   비어 있을 때 옅은 배경으로 '여기도 적을 수 있다'를 보인다 */
+.spare {
+  background: var(--ant-color-fill-quaternary, #f5f6f7);
+}
+
+.locationValue {
+  text-align: center;
+}
+
+/* 줄 삭제 버튼 자리 — 양식 바깥의 화면 도구라 격자선을 두지 않는다 */
+.rowAction {
+  width: 28px;
+  border: none !important;
+  text-align: center;
+}
+
+.rowAction button {
+  opacity: 0;
+}
+
+.itemRow:hover .rowAction button,
+.rowAction button:focus-visible {
+  opacity: 1;
+}
+
+/* --- 셀 안의 입력칸 --- */
+
+/*
+ * 셀에 항상 입력칸이 깔려 있어 클릭하면 바로 타이핑된다.
+ * 셀 안에 또 테두리가 있으면 격자선과 겹쳐 보이므로 입력칸의 테두리를 없앤다.
+ */
+.cell {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  outline: none;
+}
+
+/* 지금 어느 칸에 있는지 보이게 한다 — 엑셀의 선택 셀 테두리에 해당 */
+.cell:focus {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--ant-color-primary, #217346);
+}
+
+.cell::placeholder {
+  color: var(--ant-color-text-quaternary, #b8bfc7);
+}
+
+.number {
+  text-align: right;
+  padding-inline-end: 8px;
+}
+
+/*
+ * 확인이 필요한 칸.
+ * AI가 채웠지만 사람이 봐야 하는 칸만 칠한다 — 사람이 고치면 표시가 사라진다.
+ */
+.uncertain {
+  background: var(--ant-color-warning-bg, #fffbe6);
+  box-shadow: inset 2px 0 0 var(--ant-color-warning, #d48806);
+}
+
+.uncertain .cell:focus {
+  background: var(--ant-color-warning-bg, #fffbe6);
+}
+
+/* 분석 실패 안내 — 양식이 아니라 화면 도구라 격자 바깥에 둔다 */
+.failure {
+  padding: 2px 1px;
+  color: var(--ant-color-warning-text, #ad6800);
+  font-size: 11px;
+  text-align: start;
+  white-space: normal;
+}
+
+/*
+ * 작업일 줄 — 양식에는 없는 칸이지만 집계가 이 값으로 날짜를 묶는다.
+ * 파일명 줄과 같은 화면 도구 영역이라 격자 밖 밀도로 둔다.
+ */
+.workDate {
+  padding: 2px 1px;
+}

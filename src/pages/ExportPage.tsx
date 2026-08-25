@@ -1,32 +1,24 @@
 import { useState } from 'react'
 
-import { DownloadOutlined, PrinterOutlined } from '@ant-design/icons'
+import { DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Checkbox,
-  Empty,
-  Flex,
-  Tabs,
-  theme as antdTheme,
-  Typography,
-} from 'antd'
-import { useParams } from 'react-router'
+import { Alert, App, Button, Flex, Typography } from 'antd'
+import { Link, useParams } from 'react-router'
 
 import { getPhotos } from '@/api/photos'
 import { getProject } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
 import { buildRecordsWorkbook, downloadBlob } from '@/features/export/excel'
-import { PhotoSheet } from '@/features/photo-sheet/PhotoSheet'
 
+/**
+ * 내보내기 — 사진대지를 엑셀 파일로 받는다.
+ *
+ * **검수 완료된 사진만 내보낸다.** 집계와 같은 기준이다 —
+ * 한쪽에는 있고 다른 쪽에는 없는 물량이 생기면 둘 중 어느 숫자를 믿을지 알 수 없다.
+ */
 export function ExportPage() {
   const { projectId = '' } = useParams()
   const { message } = App.useApp()
-  const { token } = antdTheme.useToken()
-  const [confirmedOnly, setConfirmedOnly] = useState(true)
   const [generating, setGenerating] = useState(false)
 
   const { data: project } = useQuery({
@@ -38,14 +30,15 @@ export function ExportPage() {
     queryFn: () => getPhotos(projectId),
   })
 
-  const analyzed = photos.filter((p) => p.status === 'analyzed')
-  const target = confirmedOnly ? analyzed.filter((p) => p.reviewStatus === 'confirmed') : analyzed
-  const pendingCount = analyzed.filter((p) => p.reviewStatus === 'pending').length
+  // 분석 실패 사진도 사람이 채워 확정했으면 내보낸다 — 값을 채운 건 사람이다
+  const settled = photos.filter((p) => p.status !== 'uploading' && p.status !== 'analyzing')
+  const target = settled.filter((p) => p.reviewStatus === 'confirmed')
+  const pendingCount = settled.length - target.length
   const projectName = project?.name ?? ''
 
   async function downloadExcel() {
     if (target.length === 0) {
-      message.warning('내보낼 데이터가 없습니다. 필터를 변경해주세요.')
+      message.warning('검수 완료된 사진이 없습니다. 사진대지에서 검수를 먼저 해주세요.')
       return
     }
     setGenerating(true)
@@ -59,95 +52,39 @@ export function ExportPage() {
     }
   }
 
-  const filters = (
-    <Flex align="center" gap={16}>
-      <Checkbox checked={confirmedOnly} onChange={(e) => setConfirmedOnly(e.target.checked)}>
-        검수 완료만 포함
-      </Checkbox>
-      <Typography.Text type="secondary">포함 {target.length}건</Typography.Text>
-    </Flex>
-  )
-
-  const warning = !confirmedOnly && pendingCount > 0 && (
-    <Alert
-      type="warning"
-      showIcon
-      title={`미검수 데이터 ${pendingCount}건이 포함됩니다`}
-      description="검수하지 않은 AI 추출값이 그대로 내보내집니다."
-    />
-  )
-
   return (
     <Flex vertical gap={16}>
       <Typography.Title level={3} style={{ margin: 0 }}>
         내보내기
       </Typography.Title>
 
-      <Tabs
-        items={[
-          {
-            key: 'excel',
-            label: '엑셀',
-            children: (
-              <Flex vertical gap={16}>
-                {filters}
-                {warning}
-                <div>
-                  <Button
-                    type="primary"
-                    icon={<DownloadOutlined />}
-                    loading={generating}
-                    disabled={target.length === 0}
-                    onClick={downloadExcel}
-                  >
-                    XLSX 내려받기
-                  </Button>
-                </div>
-              </Flex>
-            ),
-          },
-          {
-            key: 'sheet',
-            label: '사진대지',
-            children: (
-              <Flex vertical gap={16}>
-                {filters}
-                {warning}
-                <div>
-                  <Button
-                    icon={<PrinterOutlined />}
-                    disabled={target.length === 0}
-                    onClick={() => window.print()}
-                  >
-                    인쇄 · PDF로 저장
-                  </Button>
-                </div>
-                <Card
-                  size="small"
-                  title="미리보기"
-                  styles={{ body: { background: token.colorBgLayout } }}
-                >
-                  {target.length === 0 ? (
-                    <Empty description="검수 완료된 작업 사진이 없습니다" />
-                  ) : (
-                    <PhotoSheet
-                      projectName={projectName}
-                      entries={target.map((photo) => ({
-                        id: photo.id,
-                        seq: photo.seq,
-                        // 분리된 작업 사진이 없으면 원본을 대신 쓴다
-                        imageUrl: photo.croppedUrl ?? photo.originalUrl,
-                        location: photo.location,
-                        workItems: photo.workItems,
-                      }))}
-                    />
-                  )}
-                </Card>
-              </Flex>
-            ),
-          },
-        ]}
-      />
+      <Typography.Text type="secondary">검수 완료 {target.length}장을 내보냅니다</Typography.Text>
+
+      {pendingCount > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          title={`검수하지 않은 사진 ${pendingCount}장은 빠집니다`}
+          description={
+            <>
+              확인이 필요한 칸을 채우고 검수 완료로 넘기면 함께 내보내집니다.{' '}
+              <Link to={`/projects/${projectId}/sheet`}>사진대지에서 검수하기</Link>
+            </>
+          }
+        />
+      )}
+
+      <div>
+        <Button
+          type="primary"
+          icon={<DownloadOutlined />}
+          loading={generating}
+          disabled={target.length === 0}
+          onClick={downloadExcel}
+        >
+          XLSX 내려받기
+        </Button>
+      </div>
     </Flex>
   )
 }

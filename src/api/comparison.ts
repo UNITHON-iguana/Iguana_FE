@@ -1,5 +1,6 @@
 import { planMaterialItems, planWorkItems, photos } from '@/mocks/db'
 import { delay } from '@/mocks/delay'
+import { totalQuantity } from '@/lib/workItems'
 import type { CompareStatus, MaterialComparisonRow, WorkComparisonRow } from '@/types'
 
 function statusOf(planned: number | null, actual: number | null): CompareStatus {
@@ -27,7 +28,7 @@ export function getWorkComparison(projectId: string): Promise<WorkComparisonRow[
         (item) => item.location === plan.location && item.category === plan.description,
       )
       const actual = matched.length
-        ? matched.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+        ? matched.reduce((sum, item) => sum + totalQuantity(item), 0)
         : null
 
       return {
@@ -55,7 +56,7 @@ export function getMaterialComparison(projectId: string): Promise<MaterialCompar
         (item) => item.location === plan.location && item.category === plan.material,
       )
       const actual = matched.length
-        ? matched.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+        ? matched.reduce((sum, item) => sum + totalQuantity(item), 0)
         : null
 
       return {

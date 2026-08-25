@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 
+import { filledEntries, hasContent } from '@/lib/workItems'
 import type { Photo } from '@/types'
 
 /**
@@ -16,10 +17,8 @@ export async function buildRecordsWorkbook(projectName: string, photos: Photo[])
     { header: '작업일', key: 'workDate', width: 14 },
     { header: '위치', key: 'location', width: 14 },
     { header: '구분', key: 'category', width: 24 },
-    { header: '작업내용', key: 'description', width: 24 },
-    { header: '규격', key: 'spec', width: 14 },
+    { header: '규격', key: 'spec', width: 16 },
     { header: '수량', key: 'quantity', width: 10 },
-    { header: '단위', key: 'unit', width: 10 },
   ]
   sheet.getRow(1).font = { bold: true }
 
@@ -27,17 +26,22 @@ export async function buildRecordsWorkbook(projectName: string, photos: Photo[])
   sheet.headerFooter.oddHeader = `&L${projectName}&R사진대지 현장 기록`
 
   for (const photo of photos) {
-    for (const item of photo.workItems) {
-      sheet.addRow({
-        seq: photo.seq,
-        workDate: photo.workDate ?? '',
-        location: photo.location ?? '',
-        category: item.category ?? '',
-        description: item.description ?? '',
-        spec: item.spec ?? '',
-        quantity: item.quantity ?? '',
-        unit: item.unit ?? '',
-      })
+    for (const item of photo.workItems.filter(hasContent)) {
+      /*
+       * 한 구분에 규격이 여럿이면 규격마다 한 행씩 펼친다.
+       * 화면의 사진대지 양식은 이 쌍을 옆으로 늘어놓지만,
+       * 집계용 엑셀은 한 행에 하나여야 걸러내고 더할 수 있다.
+       */
+      for (const entry of filledEntries(item)) {
+        sheet.addRow({
+          seq: photo.seq,
+          workDate: photo.workDate ?? '',
+          location: photo.location ?? '',
+          category: item.category ?? '',
+          spec: entry.spec ?? '',
+          quantity: entry.quantity ?? '',
+        })
+      }
     }
   }
 

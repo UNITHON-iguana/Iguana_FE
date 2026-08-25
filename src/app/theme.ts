@@ -9,7 +9,7 @@ import type { ThemeConfig } from 'antd'
  *
  * 사용법
  * - 컴포넌트(tsx): `theme.useToken()`으로 읽는다. 색상 리터럴 금지(ESLint가 잡는다).
- * - 인쇄용 CSS: `var(--ant-color-border)` 같은 CSS 변수를 쓴다(cssVar 모드).
+ * - CSS 모듈: `var(--ant-color-border)` 같은 CSS 변수를 쓴다(cssVar 모드).
  * - antd 토큰에 대응이 없는 개념: 이 파일에서 export 한 상수를 쓴다.
  *
  * 전역 토큰(`token`)은 아직 한 번도 안 쓴 컴포넌트에도 자동으로 적용된다.
@@ -46,7 +46,7 @@ export const SHEET_CATEGORY_BG = '#eaf0e2'
 export const SHEET_SEQ_COLOR = '#c0392b'
 
 export const theme: ThemeConfig = {
-  // 토큰을 CSS 변수(--ant-*)로 내보낸다. 인쇄용 CSS에서도 같은 값을 참조할 수 있다.
+  // 토큰을 CSS 변수(--ant-*)로 내보낸다. CSS 모듈에서도 같은 값을 참조할 수 있다.
   // v6에서는 boolean이 아니라 옵션 객체를 받는다 — 빈 객체면 기본 prefix(ant)를 쓴다.
   cssVar: {},
 

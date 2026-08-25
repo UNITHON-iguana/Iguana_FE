@@ -4,7 +4,7 @@
  * 화면은 src/api를 통해서만 이 데이터를 읽는다.
  * 실제 백엔드가 붙으면 src/api 안쪽만 HTTP 호출로 바꾸면 되고 화면은 그대로다.
  */
-import type { PlanMaterialItem, PlanWorkItem, Photo, Project } from '@/types'
+import type { PlanMaterialItem, PlanWorkItem, Photo, Project, WorkItem } from '@/types'
 
 import { placeholderImage } from './placeholder'
 
@@ -96,7 +96,16 @@ export const planMaterialItems: PlanMaterialItem[] = [
   },
 ]
 
-let seq = 538
+/*
+ * 사진 목 데이터.
+ * 실제 현장 사진대지(내화채움)에서 값을 그대로 가져와, 화면이 원본 양식과
+ * 같은 인상을 주는지 눈으로 확인할 수 있게 했다.
+ * `uncertain`이 붙은 칸은 AI가 자신 없게 채운 칸이라 사진대지에서 노랗게 뜬다.
+ *
+ * 검수 상태는 분석이 끝난 뒤의 모습을 그대로 담는다 — 확인할 칸이 없는 사진은
+ * 자동으로 `confirmed`, 확인할 칸이 남은 사진과 분석 실패 사진만 `pending`이다.
+ */
+let seq = 623
 
 function photo(overrides: Partial<Photo> & Pick<Photo, 'id' | 'fileName'>): Photo {
   const n = seq++
@@ -108,115 +117,96 @@ function photo(overrides: Partial<Photo> & Pick<Photo, 'id' | 'fileName'>): Phot
     status: 'analyzed',
     failureReason: null,
     workDate: '2026-08-20',
-    location: '지하2층',
+    location: '리테일 4층',
     workItems: [],
     reviewStatus: 'pending',
     ...overrides,
   }
 }
 
+/** 규격·수량 한 쌍짜리 작업 항목 — 목 데이터 대부분이 이 모양이다 */
+function item(
+  id: string,
+  category: string,
+  spec: string,
+  quantity: number,
+  uncertain?: WorkItem['uncertain'],
+): WorkItem {
+  return {
+    id,
+    category,
+    entries: [
+      { spec, quantity },
+      { spec: null, quantity: null },
+    ],
+    uncertain,
+  }
+}
+
 export const photos: Photo[] = [
   photo({
     id: 'ph1',
-    fileName: 'KakaoTalk_20260820_01.jpg',
+    fileName: 'KakaoTalk_20260818_01.jpg',
+    workDate: '2026-08-18',
+    // 확인할 칸이 없어 분석 직후 자동으로 확정된 사진
+    reviewStatus: 'confirmed',
     workItems: [
-      {
-        id: 'w1',
-        category: '금속관벽체',
-        description: '관통부 마감',
-        spec: '100',
-        quantity: 1,
-        unit: '개소',
-      },
+      item('w1', '보온덕트입상', '1300*800', 0.5),
+      item('w2', '무보온덕트입상', '1300*800', 0.5),
+      item('w3', '차열재마감', '1300*800', 5.5),
     ],
   }),
   photo({
     id: 'ph2',
-    fileName: 'KakaoTalk_20260820_02.jpg',
+    fileName: 'KakaoTalk_20260818_02.jpg',
+    workDate: '2026-08-18',
+    reviewStatus: 'confirmed',
     workItems: [
-      {
-        id: 'w2',
-        category: '무보온덕트벽체',
-        description: '덕트 관통부',
-        spec: '800*400',
-        quantity: 1,
-        unit: '개소',
-      },
-      {
-        id: 'w3',
-        category: '무보온벽체차열재마감',
-        description: '차열재 마감',
-        spec: '800*400',
-        quantity: 2,
-        unit: 'EA',
-      },
-      {
-        id: 'w4',
-        category: '오픈구',
-        description: '오픈구 처리',
-        spec: '800*300',
-        quantity: 1,
-        unit: '개소',
-      },
+      item('w4', '보온덕트벽체', '2000*800', 0.5),
+      item('w5', '차열재마감', '2000*800', 1),
+      item('w6', '오픈구', '2000*200', 0.5),
     ],
   }),
   photo({
     id: 'ph3',
-    fileName: 'KakaoTalk_20260820_03.jpg',
-    reviewStatus: 'confirmed',
+    fileName: 'KakaoTalk_20260819_03.jpg',
+    workDate: '2026-08-19',
+    // 구분은 읽었지만 수량을 못 읽은 경우 — 그 칸만 확인 필요로 뜬다
     workItems: [
+      item('w7', '무보온덕트벽체', '2000*600', 0.5),
       {
-        id: 'w5',
-        category: '무보온덕트벽체',
-        description: '덕트 관통부',
-        spec: '800*400',
-        quantity: 1,
-        unit: '개소',
-      },
-      {
-        id: 'w6',
-        category: '무보온벽체차열재마감',
-        description: '차열재 마감',
-        spec: '800*400',
-        quantity: 2,
-        unit: 'EA',
-      },
-      {
-        id: 'w7',
-        category: '오픈구',
-        description: '오픈구 처리',
-        spec: '800*200',
-        quantity: 1,
-        unit: '개소',
+        id: 'w8',
+        category: '차열재마감',
+        entries: [
+          { spec: '2000*600', quantity: null, uncertain: { quantity: '수량을 읽지 못했습니다' } },
+          { spec: null, quantity: null },
+        ],
       },
     ],
   }),
   photo({
     id: 'ph4',
-    fileName: 'KakaoTalk_20260820_04.jpg',
-    reviewStatus: 'confirmed',
+    fileName: 'KakaoTalk_20260819_04.jpg',
+    workDate: '2026-08-19',
+    // 사진 속 스탬프가 흐려 위치를 확신하지 못한 경우
+    uncertain: { location: '사진의 위치 표기를 확신하지 못했습니다' },
     workItems: [
-      {
-        id: 'w8',
-        category: '무보온덕트벽체',
-        description: '덕트 관통부',
-        spec: '300*200',
-        quantity: 2,
-        unit: '개소',
-      },
-      {
-        id: 'w9',
-        category: '무보온벽체차열재마감',
-        description: '차열재 마감',
-        spec: '300*200',
-        quantity: 4,
-        unit: 'EA',
-      },
+      item('w9', '무보온덕트벽체', '1600*500', 0.5),
+      item('w10', '차열재마감', '1600*500', 0.5),
     ],
   }),
   photo({
     id: 'ph5',
     fileName: 'KakaoTalk_20260820_05.jpg',
+    reviewStatus: 'confirmed',
+    workItems: [
+      item('w11', '무보온덕트벽체', '300*200', 2),
+      item('w12', '무보온벽체차열재마감', '300*200', 4),
+    ],
+  }),
+  photo({
+    id: 'ph6',
+    fileName: 'KakaoTalk_20260820_06.jpg',
     status: 'failed',
     croppedUrl: null,
     failureReason: '텍스트 영역을 찾지 못했습니다',
