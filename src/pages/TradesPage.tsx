@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Empty, Flex, Input, Popconfirm, Tooltip, Typography } from 'antd'
@@ -28,10 +30,23 @@ export function TradesPage() {
   const { message } = App.useApp()
   const queryClient = useQueryClient()
 
-  const { data: trades = [], isLoading } = useQuery({
+  /**
+   * 저장되지 않은 편집분. 서버 값 위에 덮어 쓴다.
+   *
+   * 고친 값을 쿼리 캐시(`setQueryData`)에 넣고 다시 읽어 오지 않는다 — 캐시 변경은
+   * 구독자에게 한 박자 늦게(`setTimeout`) 알려서, 한글을 조합하는 동안 한 글자 전 값이
+   * 입력칸에 되써진다. 브라우저는 그것을 조합 종료로 보고 조합 중이던 글자를 확정하므로
+   * `금속관`을 치면 `ㄱ그금ㅅ소속ㄱ고관`이 남는다. 계획 표와 같은 방식으로 둔다.
+   */
+  const [drafts, setDrafts] = useState<Record<string, Trade>>({})
+
+  const { data: saved = [], isLoading } = useQuery({
     queryKey: queryKeys.trades(projectId),
     queryFn: () => getTrades(projectId),
   })
+
+  /** 편집분을 덮어쓴 현재 값 */
+  const trades = saved.map((trade) => drafts[trade.id] ?? trade)
 
   /* 이미 실적이 쌓인 공종을 못 지우게 막으려고 집계를 같이 본다. 화면에 표로 그리지는 않는다 */
   const { data: aggregation } = useQuery({
@@ -70,9 +85,7 @@ export function TradesPage() {
 
   /** 편집분을 바로 화면에 반영한다. 서버로는 그 줄에서 손을 뗄 때 나간다 */
   function edit(trade: Trade) {
-    queryClient.setQueryData<Trade[]>(queryKeys.trades(projectId), (prev) =>
-      prev?.map((item) => (item.id === trade.id ? trade : item)),
-    )
+    setDrafts((prev) => ({ ...prev, [trade.id]: trade }))
     autosave.edit(trade)
   }
 
