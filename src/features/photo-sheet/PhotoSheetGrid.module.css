@@ -166,15 +166,6 @@
   background: var(--ant-color-warning-bg, #fffbe6);
 }
 
-/* 분석 실패 안내 — 양식이 아니라 화면 도구라 격자 바깥에 둔다 */
-.failure {
-  padding: 2px 1px;
-  color: var(--ant-color-warning-text, #ad6800);
-  font-size: 11px;
-  text-align: start;
-  white-space: normal;
-}
-
 /*
  * 작업일 줄 — 양식에는 없는 칸이지만 집계가 이 값으로 날짜를 묶는다.
  * 파일명 줄과 같은 화면 도구 영역이라 격자 밖 밀도로 둔다.

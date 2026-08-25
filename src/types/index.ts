@@ -56,9 +56,6 @@ export interface PlanWorkItem {
  */
 export type Uncertain<K extends string> = Partial<Record<K, string>>
 
-/** 사진 처리 단계 */
-export type PhotoStatus = 'uploading' | 'analyzing' | 'analyzed' | 'failed'
-
 /** 검수 상태 */
 export type ReviewStatus = 'pending' | 'confirmed'
 
@@ -110,8 +107,6 @@ export interface Photo {
   originalUrl: string
   /** 격자에 거는 축소본. 한 화면에 수십 장이 깔려 원본을 그대로 걸지 않는다 */
   thumbnailUrl: string | null
-  status: PhotoStatus
-  failureReason: string | null
   workDate: string | null
   /** 위치 — 사진 단위로 하나 */
   location: string | null

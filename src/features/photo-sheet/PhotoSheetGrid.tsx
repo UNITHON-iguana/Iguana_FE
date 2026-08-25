@@ -498,12 +498,6 @@ export function PhotoSheetGrid({
                               }
                             />
                           </div>
-                          {photo.status === 'failed' && (
-                            /* 분석이 실패한 사진은 칸이 비어 있는 이유를 사진 옆에 밝힌다 */
-                            <div className={styles.failure}>
-                              분석 실패 · {photo.failureReason ?? '사유 미상'} — 직접 입력해주세요
-                            </div>
-                          )}
                           {renderPhotoExtra?.(photo)}
                         </td>
                       </>

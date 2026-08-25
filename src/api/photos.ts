@@ -106,8 +106,6 @@ function toPhoto(res: PhotoUploadResponse, projectId: string): Photo {
     fileName: res.originalUrl.split('/').pop() ?? '',
     originalUrl: res.originalUrl,
     thumbnailUrl: res.thumbnailUrl,
-    status: 'analyzed',
-    failureReason: null,
     workDate: res.workDate,
     location: res.location,
     /*

@@ -44,18 +44,13 @@ export function photoUncertainCount(photo: Photo): number {
  * 검수 완료를 막는 이유. 없으면 null — 그대로 확정할 수 있다.
  *
  * **확정된 사진만 집계와 내보내기에 들어간다.** 그래서 이 판정 하나가 곧
- * '이 사진이 실적이 되는가'다. 분석 직후 자동 확정, 사진대지의 확인 필요 필터,
- * 검수 완료 체크박스 잠금이 모두 이 함수를 쓴다 — 세 곳의 기준이 어긋나면
- * 사람 눈에는 멀쩡한 사진이 집계에서만 조용히 빠지는 일이 생긴다.
+ * '이 사진이 실적이 되는가'다. 사진에서 손을 뗄 때 나가는 확정 호출과 사진대지의
+ * 확인 필요 표시가 같은 함수를 쓴다 — 둘이 어긋나면 사람 눈에는 멀쩡한 사진이
+ * 집계에서만 조용히 빠진다.
+ *
+ * **서버가 400을 내는 조건과 같아야 한다.** 어긋나면 저장이 서버에서 되돌아온다.
  */
 export function confirmBlocker(photo: Photo): string | null {
-  // 서버가 확정을 받아주지 않는 조건과 같아야 한다. 어긋나면 반영에서 400이 돌아온다
-  if (photo.status === 'uploading' || photo.status === 'analyzing') {
-    return '분석이 끝나면 검수할 수 있습니다'
-  }
-  if (photo.status === 'failed' && !photo.workItems.some(hasContent)) {
-    return '분석에 실패했습니다. 작업 항목을 직접 채우거나 사진을 지워주세요'
-  }
   const uncertain = photoUncertainCount(photo)
   if (uncertain > 0) return `확인이 필요한 칸 ${uncertain}개를 먼저 채워주세요`
   /*

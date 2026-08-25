@@ -22,13 +22,6 @@ export const DEFAULT_WORK_ITEM_ROWS = 3
  */
 export const SHEET_ENTRY_SLOTS = 2
 
-export const PHOTO_STATUS_LABEL = {
-  uploading: '업로드 중',
-  analyzing: '분석 중',
-  analyzed: '분석 완료',
-  failed: '분석 실패',
-} as const
-
 export const REVIEW_STATUS_LABEL = {
   pending: '미검수',
   confirmed: '검수 완료',
