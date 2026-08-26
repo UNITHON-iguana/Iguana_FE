@@ -165,7 +165,8 @@ export const theme: ThemeConfig = {
     },
 
     Modal: {
-      headerBg: HEADER_BG,
+      // 제목 줄에 회색 띠를 두르지 않는다 — 표의 머리글이 아니라 그냥 제목이다
+      headerBg: '#ffffff',
       titleFontSize: 14,
       contentBg: '#ffffff',
       padding: 16,
