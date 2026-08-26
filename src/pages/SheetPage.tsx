@@ -247,15 +247,24 @@ export function SheetPage() {
   const current = items.map((photo) => drafts[photo.id] ?? photo)
 
   /*
-   * 사진에서 손을 떼기 전에 창을 닫으면 그 한 장은 아직 안 나갔다.
-   * 저장 자체는 확인할 칸이 남아도 되므로, 붙잡는 것은 이 짧은 틈뿐이다.
+   * 창을 닫거나 새로고침하면 끊기는 두 가지를 붙잡는다.
+   *
+   * 하나는 **손을 떼기 전인 사진 한 장** — 저장 자체는 확인할 칸이 남아도 되므로
+   * 붙잡는 것은 이 짧은 틈뿐이다. 다른 하나는 **올리는 중인 사진**이다. 업로드는
+   * 분석까지 한 호출이라 오래 걸리는데, 끊기면 서버가 어디까지 했는지 화면이 알 길이
+   * 없다 — 결과를 받을 연결이 사라져 토스트도 목록 갱신도 없다.
+   *
+   * 막지는 못한다. 브라우저 기본 확인창을 한 번 띄울 뿐이고 문구도 우리가 정하지
+   * 못한다. 조용히 날리는 대신 묻고 날리게 하는 것이 여기서 할 수 있는 전부다.
+   *
+   * 메뉴로 옮기는 길에는 걸리지 않는다 — 페이지가 떠나지 않아 요청도 안 끊긴다.
    */
   useEffect(() => {
-    if (unsent === 0) return
+    if (unsent === 0 && !uploading) return
     const hold = (event: BeforeUnloadEvent) => event.preventDefault()
     window.addEventListener('beforeunload', hold)
     return () => window.removeEventListener('beforeunload', hold)
-  }, [unsent])
+  }, [unsent, uploading])
 
   /**
    * 값을 고쳤을 때 — 화면에만 얹고 아직 보내지 않는다.
@@ -478,6 +487,12 @@ export function SheetPage() {
             multiple
             accept={ACCEPTED_IMAGE_EXTENSIONS}
             showUploadList={false}
+            /*
+             * 버튼이 스피너를 도는 동안 파일 선택창이 열리지 않게 한다.
+             * `Button`의 `loading`만으로는 안 막힌다 — 클릭을 받는 것은 버튼이 아니라
+             * `Upload`가 감싼 바깥쪽이라 버튼의 `onClick`을 건너뛴다.
+             */
+            disabled={uploading}
             beforeUpload={(file, fileList) => {
               // 브라우저가 목록 전체를 한 번에 넘겨주므로 첫 호출에서만 처리한다
               if (file === fileList[0]) add(fileList as File[])
