@@ -80,7 +80,7 @@ export function PlanPage() {
     queryFn: () => getWorkComparison(projectId),
   })
   /* 공종 칸이 고르는 목록. 서버가 공종을 id로 받아 이름만으로는 저장할 수 없다 */
-  const { data: workTypes = [] } = useQuery({
+  const { data: workTypes = [], isLoading: loadingWorkTypes } = useQuery({
     queryKey: queryKeys.workTypes(projectId),
     queryFn: () => getWorkTypes(projectId),
   })
@@ -214,7 +214,8 @@ export function PlanPage() {
         계획
       </Typography.Title>
 
-      {items.length === 0 && (
+      {/* 아직 안 온 것을 없다고 말하지 않는다 — 불러오는 동안은 아무 말도 하지 않는다 */}
+      {!isLoading && items.length === 0 && (
         <Alert
           type="warning"
           showIcon
@@ -223,7 +224,7 @@ export function PlanPage() {
         />
       )}
 
-      {workTypes.length === 0 && (
+      {!loadingWorkTypes && workTypes.length === 0 && (
         <Alert
           type="info"
           showIcon
@@ -236,7 +237,7 @@ export function PlanPage() {
         items={[
           {
             key: 'work',
-            label: `계획 공정 (${items.length})`,
+            label: isLoading ? '계획 공정' : `계획 공정 (${items.length})`,
             children: (
               <PlanItemTable
                 items={current}
@@ -255,7 +256,9 @@ export function PlanPage() {
             key: 'work-compare',
             label: '공정 비교',
             children:
-              items.length === 0 ? (
+              // 표 자체는 `comparing`을 받아 스스로 자리를 깐다. 여기서는 계획 줄이
+              // 아직 안 온 사이에 `계획 데이터가 없어`를 띄우지만 않으면 된다
+              !isLoading && items.length === 0 ? (
                 <Empty description="계획 데이터가 없어 비교할 수 없습니다. 계획 공정을 먼저 입력해주세요." />
               ) : (
                 <Flex vertical gap={16}>

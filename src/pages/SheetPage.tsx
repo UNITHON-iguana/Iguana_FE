@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import {
-  CheckOutlined,
-  DownloadOutlined,
-  PictureOutlined,
-} from '@ant-design/icons'
+import { CheckOutlined, DownloadOutlined, PictureOutlined } from '@ant-design/icons'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -22,18 +18,13 @@ import {
 } from 'antd'
 import { Link, useParams } from 'react-router'
 
-import {
-  addPhotos,
-  savePhoto,
-  getPhotoPage,
-  getPhotoSummary,
-  removePhoto,
-} from '@/api/photos'
+import { addPhotos, savePhoto, getPhotoPage, getPhotoSummary, removePhoto } from '@/api/photos'
 import type { PhotoCounts, PhotoScope, WorkDateFilter, WorkDateOption } from '@/api/photos'
 import { downloadSheetExcel } from '@/api/exports'
 import { getProject } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
 import { getWorkTypes } from '@/api/workTypes'
+import { TableSkeleton } from '@/components/TableSkeleton'
 import { PhotoSheetGrid } from '@/features/photo-sheet/PhotoSheetGrid'
 import { ACCEPTED_IMAGE_EXTENSIONS, PHOTOS_PER_PAGE } from '@/lib/constants'
 import { confirmBlocker } from '@/lib/workItems'
@@ -132,7 +123,7 @@ export function SheetPage() {
    * `구 분` 칸이 고르는 목록.
    * 화면은 이름만 쓰지만 확정할 때 서버에 id를 보내야 해서 목록을 통째로 쥔다.
    */
-  const { data: workTypes = [] } = useQuery({
+  const { data: workTypes = [], isLoading: loadingWorkTypes } = useQuery({
     queryKey: queryKeys.workTypes(projectId),
     queryFn: () => getWorkTypes(projectId),
   })
@@ -146,7 +137,7 @@ export function SheetPage() {
    * 어느 탭을 열지가 이 수로 정해지는데 목록에 딸려 오면 순환이 되고,
    * 목록을 건드리지 않고 진행 상황만 다시 물어볼 자리도 필요하다.
    */
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: loadingSummary } = useQuery({
     queryKey: queryKeys.photoSummary(projectId, workDate),
     queryFn: () => getPhotoSummary(projectId, workDate),
   })
@@ -417,7 +408,12 @@ export function SheetPage() {
     <Flex vertical gap={12}>
       {filters}
       {current.length === 0 ? (
-        !isLoading && <Empty description={emptyDescription()} />
+        // 아직 오는 중이면 자리를 깔아둔다. 없다고 말하는 것은 다 받고 나서다
+        isLoading ? (
+          <TableSkeleton rows={6} />
+        ) : (
+          <Empty description={emptyDescription()} />
+        )
       ) : (
         <>
           {pager}
@@ -461,9 +457,7 @@ export function SheetPage() {
             사진대지
           </Typography.Title>
           {counts.photos > 0 && (
-            <Typography.Text type="secondary">
-              사진 {counts.photos}장
-            </Typography.Text>
+            <Typography.Text type="secondary">사진 {counts.photos}장</Typography.Text>
           )}
         </Flex>
 
@@ -501,7 +495,7 @@ export function SheetPage() {
         공종은 AI가 고를 후보 목록이다. 비어 있으면 사진을 아무리 올려도 붙일 이름이
         없다 — 사진을 올리기 전에 알아야 하므로 목록보다 위에 둔다.
       */}
-      {workTypes.length === 0 && (
+      {!loadingWorkTypes && workTypes.length === 0 && (
         <Alert
           type="warning"
           showIcon
@@ -516,7 +510,15 @@ export function SheetPage() {
       )}
 
       {counts.photos === 0 ? (
-        !isLoading && <Empty description={emptyDescription()} />
+        /*
+         * 이 수는 목록과 다른 요청으로 온다(`summary`). 그쪽 로딩을 함께 보지 않으면
+         * 목록이 먼저 도착한 순간 `사진이 없습니다`가 잠깐 떴다 사라진다.
+         */
+        isLoading || loadingSummary ? (
+          <TableSkeleton rows={6} />
+        ) : (
+          <Empty description={emptyDescription()} />
+        )
       ) : (
         <Tabs
           activeKey={view}

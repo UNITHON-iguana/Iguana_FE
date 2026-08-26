@@ -213,7 +213,12 @@ export function SummaryPage() {
                   <Typography.Text type="secondary">
                     {month.format('YYYY년 M월')} · 공종별 작업일별 집계
                   </Typography.Text>
-                  <PivotTable {...daily} formatColumn={formatDay} totalColumn="계" />
+                  <PivotTable
+                    {...daily}
+                    formatColumn={formatDay}
+                    totalColumn="계"
+                    loading={isLoading}
+                  />
                 </Flex>
               ),
           },
@@ -228,7 +233,12 @@ export function SummaryPage() {
                   <Typography.Text type="secondary">
                     월별 집계와 누계 · 기간을 자르지 않습니다
                   </Typography.Text>
-                  <PivotTable {...cumulative} formatColumn={formatMonth} totalColumn="누계" />
+                  <PivotTable
+                    {...cumulative}
+                    formatColumn={formatMonth}
+                    totalColumn="누계"
+                    loading={isLoading}
+                  />
                 </Flex>
               ),
           },

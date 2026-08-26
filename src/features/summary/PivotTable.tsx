@@ -36,6 +36,8 @@ export interface PivotTableProps {
   formatColumn: (column: string) => string
   /** 맨 오른쪽 행 합계 열의 머리글 */
   totalColumn: string
+  /** 아직 서버에서 오는 중인지. 빈 표와 안 온 표를 `DataTable`이 갈라 그린다 */
+  loading?: boolean
 }
 
 /**
@@ -51,6 +53,7 @@ export function PivotTable({
   grandTotal,
   formatColumn,
   totalColumn,
+  loading,
 }: PivotTableProps) {
   const valueColumns: ColumnType<AggregationRow>[] = columns.map((column) =>
     numberColumn<AggregationRow>({
@@ -72,6 +75,7 @@ export function PivotTable({
   return (
     <DataTable<AggregationRow>
       rowKey={rowKey}
+      loading={loading}
       dataSource={rows}
       scroll={{ x: 'max-content' }}
       locale={{ emptyText: '집계된 공종이 없습니다.' }}
@@ -93,24 +97,29 @@ export function PivotTable({
          */
         { title: '' },
       ]}
-      summary={() => (
-        <Table.Summary fixed>
-          <Table.Summary.Row style={totalRowStyle}>
-            <Table.Summary.Cell index={0}>합계</Table.Summary.Cell>
-            <Table.Summary.Cell index={1} />
-            <Table.Summary.Cell index={2} />
-            {columns.map((column, i) => (
-              <Table.Summary.Cell key={column} index={3 + i} align="right">
-                {formatValue(totals[column])}
-              </Table.Summary.Cell>
-            ))}
-            <Table.Summary.Cell index={3 + columns.length} align="right">
-              {formatValue(grandTotal)}
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={4 + columns.length} />
-          </Table.Summary.Row>
-        </Table.Summary>
-      )}
+      /* 아직 안 온 표에 합계를 달지 않는다 — `-`가 값처럼 읽힌다 */
+      summary={
+        loading && rows.length === 0
+          ? undefined
+          : () => (
+              <Table.Summary fixed>
+                <Table.Summary.Row style={totalRowStyle}>
+                  <Table.Summary.Cell index={0}>합계</Table.Summary.Cell>
+                  <Table.Summary.Cell index={1} />
+                  <Table.Summary.Cell index={2} />
+                  {columns.map((column, i) => (
+                    <Table.Summary.Cell key={column} index={3 + i} align="right">
+                      {formatValue(totals[column])}
+                    </Table.Summary.Cell>
+                  ))}
+                  <Table.Summary.Cell index={3 + columns.length} align="right">
+                    {formatValue(grandTotal)}
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={4 + columns.length} />
+                </Table.Summary.Row>
+              </Table.Summary>
+            )
+      }
     />
   )
 }
