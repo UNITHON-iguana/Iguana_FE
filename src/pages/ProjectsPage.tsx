@@ -2,8 +2,8 @@ import { useState } from 'react'
 
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Button, Empty, Flex, Form, Input, Modal, Popconfirm, Typography } from 'antd'
-import { useNavigate } from 'react-router'
+import { App, Button, Empty, Flex, Form, Input, Modal, Popconfirm, Typography, theme } from 'antd'
+import { Link, useNavigate } from 'react-router'
 
 import { createProject, getProjects, removeProject } from '@/api/projects'
 import { queryKeys } from '@/api/queryKeys'
@@ -27,6 +27,7 @@ interface CreateInput {
 
 export function ProjectsPage() {
   const navigate = useNavigate()
+  const { token } = theme.useToken()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const [form] = Form.useForm<ProjectFormValues>()
@@ -87,17 +88,35 @@ export function ProjectsPage() {
     onError: () => message.error('프로젝트를 지우지 못했습니다. 잠시 후 다시 시도해주세요.'),
   })
 
+  const sheetPath = (project: Project) => `/projects/${project.id}/sheet`
+
   const columns = [
-    { title: '공사명', dataIndex: 'name' },
+    {
+      title: '공사명',
+      dataIndex: 'name',
+      /*
+       * 이름이 진짜 링크다. 행 전체를 눌러도 같은 곳으로 가지만, 키보드로 넘어오는
+       * 자리와 `새 탭으로 열기`가 되려면 앵커가 하나는 있어야 한다.
+       * 색은 회색을 그대로 쓴다 — 녹색은 사람이 결과를 만드는 동작에만 붙인다.
+       */
+      render: (_: unknown, row: Project) => (
+        <Link
+          to={sheetPath(row)}
+          style={{ color: token.colorText }}
+          // 행도 같은 곳으로 보내므로, 링크를 눌렀을 때 두 번 이동하지 않게 막는다
+          onClick={(event) => event.stopPropagation()}
+        >
+          {row.name}
+        </Link>
+      ),
+    },
     { title: '주소', dataIndex: 'address' },
     {
       title: '',
-      width: 140,
+      width: 80,
       render: (_: unknown, row: Project) => (
-        <Flex align="center" justify="end" gap={4}>
-          <Button type="link" onClick={() => navigate(`/projects/${row.id}/sheet`)}>
-            열기
-          </Button>
+        // 행 전체가 여는 자리라, 여기서 눌린 것은 행으로 새어 나가면 안 된다
+        <Flex align="center" justify="end" onClick={(event) => event.stopPropagation()}>
           {/*
             지우면 그 현장의 사진·검수 결과·공종·계획이 통째로 사라지고 되돌릴 수 없다.
             무엇이 사라지는지를 묻는 자리에서 밝힌다 — 이름만 대면 무게가 안 보인다.
@@ -130,11 +149,23 @@ export function ProjectsPage() {
         </Button>
       </Flex>
 
-      <DataTable
+      {/*
+        행 어디를 눌러도 그 현장으로 들어간다. 행에 마우스를 올리면 이미 배경이
+        변하는데 정작 눌리는 곳이 버튼 하나뿐이면, 보이는 것과 되는 것이 어긋난다.
+      */}
+      <DataTable<Project>
         rowKey="id"
         loading={isLoading}
         dataSource={projects}
         columns={columns}
+        onRow={(row) => ({
+          style: { cursor: 'pointer' },
+          onClick: () => {
+            // 주소를 드래그로 긁던 중이었다면 그건 여는 동작이 아니다
+            if (window.getSelection()?.toString()) return
+            navigate(sheetPath(row))
+          },
+        })}
         locale={{ emptyText: <Empty description="등록된 프로젝트가 없습니다" /> }}
       />
 
